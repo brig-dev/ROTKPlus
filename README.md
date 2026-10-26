@@ -11,6 +11,8 @@ ROTKPlus is a small DLL, not a replacement for the game. It works together with
 [ROTK Fix / Athelas](https://github.com/Shagg88/Athelas) by Shagg88 (which makes the game run on modern PCs), and it
 changes nothing on disk except the file it replaces (see *Installation*).
 
+Also on ModDB: <https://www.moddb.com/mods/rotkplus>
+
 > **Status:** version 1.0.0, tested on Windows 11 with Athelas 1.5 (everything) and Athelas 1.6.0 (the game starts, all
 > the patches install and the menu works; gameplay was not tried on 1.6), the Italian edition of the game, and up to four
 > controllers. Not tested on Linux / Steam Deck (Proton). English is the default
