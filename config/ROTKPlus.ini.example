@@ -1,0 +1,49 @@
+; ROTKPlus.ini - settings of ROTKPlus (game folder, next to rotk.exe)
+; Without this file the mod is OFF.
+
+[Coop]
+; 1 = third and fourth player in co-op games (and the Versus entry in the main menu); 0 = the mod does nothing
+Enabled=1
+; players of the co-op: 2, 3 or 4. It is chosen in the main menu (Co-op: left/right) and saved here
+Players=3
+; hero of the third player when it was not chosen in the selection screen:
+; auto, aragorn, legolas, gimli, gandalf, sam, frodo, pippin, merry, faramir
+; (if it is already taken, the first free one among Gimli, Legolas, Aragorn, Gandalf is used)
+Hero=auto
+; input slot of the third player: 2 = its own (it does nothing without a controller), 0 = copies player 1
+Input=2
+; 1 = the extra players use the first controllers that ROTK Fix leaves free; 0 = keyboard only
+Pad=1
+; 1 = an extra player without a controller moves with player 1's keyboard keys (normally nobody wants this: one person
+; would drive several characters); 0 = it stands still
+KeyboardFallback=0
+; for testing: pick the third player's controller by part of its name (e.g. DualSense); empty = first free one
+PadName=
+; HUD boxes of the extra players: 1 = shown. HudX/HudY move them relative to player 2's box, in fractions of the
+; screen (negative Y = up; -0.72 puts them at the top). The third player's box is at the top right, the fourth's at the
+; top left
+Hud=1
+HudX=0
+HudY=-0.72
+
+[PvP]
+; 1 = the "Versus" entry in the main menu (confirm it and the players can hit each other; any level works)
+Enabled=1
+; players of the Versus mode: 2, 3 or 4. Chosen in the main menu (Versus: left/right) and saved here
+Players=2
+; lives per player: whoever loses them stays on the ground; the last one standing wins and the level closes
+Lives=2
+
+[General]
+; language of the mod's own texts: auto (recognised from the game), en, it, fr, de, es, or a code of your own that
+; has a section in ROTKPlus.lang.ini
+Language=auto
+
+[Diag]
+; for testing only: F9 in a level ends it with a victory (to look at the end-of-level screens without playing)
+VictoryKey=0
+
+[Debug]
+; for testing only: 1 = players 2, 3 and 4 are driven by the keyboard, so the co-op can be tried without any controller
+; (player 1 uses the game's own keyboard and mouse). Keys: see the top of src/Sim.cpp
+SimPads=0

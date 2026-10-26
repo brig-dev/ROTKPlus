@@ -1,0 +1,20 @@
+; ROTKPlus.lang.ini - optional, next to rotk.exe. One section per language code; keys left out use the built-in text.
+; Placeholders: {label} name of the menu entry, {n} a number, {hero} a hero name.
+; Keep the texts short and, if possible, without accented letters (the menu font of the game may not have them).
+; "Player" is normally taken from the game's own text; this one is used when Language is set by hand.
+
+[en]
+Coop=Co-op
+Pvp=Versus
+Players={label}: {n} players
+Player=Player {n}
+Winner=Player {n} wins: {hero}
+Draw=Draw
+
+[it]
+Coop=Cooperativo
+Pvp=Sfida
+Players={label}: {n} giocatori
+Player=Giocatore {n}
+Winner=Vince il giocatore {n}: {hero}
+Draw=Pareggio
