@@ -34,6 +34,16 @@ A full round takes about 15 minutes. You do not have to do everything: do what y
 - Levels other than the first ones: levels with computer allies, long levels, the last levels, levels with cutscenes.
 - Athelas 1.6 in real gameplay.
 
+## Check your log in a few seconds
+
+`tools/check_log.py` reads `ROTKPlus.log` and tells you the ROTKPlus version, which patches were installed, any `ERROR`, `NOT installed` or `CRASH` lines and what you played. It needs only Python 3 (no extra packages):
+
+```
+python tools\check_log.py C:\Games\ROTK\ROTKPlus.log --redact ROTKPlus_redacted.log
+```
+
+`--redact` writes a copy with your Windows user name removed from the paths, ready to attach to a report. If the summary says `OK`, the mod installed correctly on your setup and the interesting part of your report is how the game behaved.
+
 ## How to report
 
 Open an issue (there are forms for a **test report** and for a **bug**) and attach `ROTKPlus.log` (and `ROTKFix.log` if the
