@@ -11,7 +11,8 @@ ROTKPlus is a small DLL, not a replacement for the game. It works together with
 [ROTK Fix / Athelas](https://github.com/Shagg88/Athelas) by Shagg88 (which makes the game run on modern PCs), and it
 changes nothing on disk except the file it replaces (see *Installation*).
 
-Also on ModDB: <https://www.moddb.com/mods/rotkplus>
+**Download:** [GitHub Releases](https://github.com/brig-dev/ROTKPlus/releases) or
+[ModDB](https://www.moddb.com/mods/rotkplus/downloads) (same file). Mod page: <https://www.moddb.com/mods/rotkplus>
 
 > **Status:** version 1.0.0, tested on Windows 11 with Athelas 1.5 (everything) and Athelas 1.6.0 (the game starts, all
 > the patches install and the menu works; gameplay was not tried on 1.6), the Italian edition of the game, and up to four
@@ -31,7 +32,7 @@ Also on ModDB: <https://www.moddb.com/mods/rotkplus>
 - The camera frames the whole group, and a player who gets stuck outside the frame is brought back to a teammate.
 - End-of-level screens (score, co-op statistics, shop) give each extra player a turn, controlled by that player's own
   controller only.
-- Versus mode: melee hits, combos, specials, the R2 execution (half of the victim's life), arrows with lock-on, the
+- Versus mode: melee hits, combos, specials, the R2 / RT execution (half of the victim's life), arrows with lock-on, the
   spear, Gandalf's area magic, and blocking all work between players. Two lives each by default; whoever loses them
   stays on the ground; the last one standing wins, with a banner and a level-up effect, and the level closes. It works
   on any level (with the level's enemies, everybody against everybody).
@@ -49,13 +50,17 @@ Also on ModDB: <https://www.moddb.com/mods/rotkplus>
 
 ## Installation
 
+Download `ROTKPlus-1.0.0.zip` from [GitHub Releases](https://github.com/brig-dev/ROTKPlus/releases) or from
+[ModDB](https://www.moddb.com/mods/rotkplus/downloads), then:
+
 1. Close the game. Make a backup copy of the game folder if you wish.
 2. In the game folder, rename `DivxMediaLib.dll` to `DivxMediaLib_orig.dll`.
-3. Copy `DivxMediaLib.dll` from ROTKPlus (the file you downloaded or built) into the game folder. ROTKPlus *is* a
+3. Copy `DivxMediaLib.dll` from the zip (or the one you built) into the game folder. ROTKPlus *is* a
    `DivxMediaLib.dll`: it forwards every call to the original and adds the mod. The game loads it when the first movie
    starts, so keep ROTK Fix's `SkipOpeningLogos = 0`.
-4. Copy `ROTKPlus.ini` (from `config/ROTKPlus.ini.example`) next to `rotk.exe` and set `[Coop] Enabled=1`. Without the
-   ini file the mod stays **off**.
+4. Copy `ROTKPlus.ini` from the zip next to `rotk.exe`; it already has `[Coop] Enabled=1`. If you built the mod yourself,
+   copy `config/ROTKPlus.ini.example` and rename it `ROTKPlus.ini` (it has the same defaults). Without the ini file the
+   mod stays **off**; `Enabled=0` turns it off again.
 5. Start the game through Athelas as usual. `ROTKPlus.log` in the game folder tells you what happened.
 
 To remove it, delete ROTKPlus's `DivxMediaLib.dll` and rename `DivxMediaLib_orig.dll` back.
