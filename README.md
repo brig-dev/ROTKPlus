@@ -119,6 +119,7 @@ This is a one-person hobby project, and it has been tested on very few setups. *
 
 - **Testing.** Try it with your own controllers and edition of the game, with 3 and 4 players, in different levels, in the
   Versus mode, and on Linux / Steam Deck (Proton). Tell us what works and what does not, with `ROTKPlus.log` attached.
+  There is a 15-minute test round in [TESTING.md](TESTING.md) and a **test report** form when you open an issue.
 - **Improvements and integrations.** Ideas that would be great: team play (2 against 2) in Versus mode, a Versus ending that
   does not go through the co-op screens, a "defeated" caption for eliminated players, separate save profiles for the extra
   players, integration with Athelas / ROTK Fix's own mod system. Pull requests and suggestions are both welcome.

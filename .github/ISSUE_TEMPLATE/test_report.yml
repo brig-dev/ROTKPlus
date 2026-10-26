@@ -1,0 +1,43 @@
+name: Test report
+description: Tell us how ROTKPlus worked on your setup (everything that worked is useful too)
+title: "Test report: "
+labels: ["testing"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for testing! See [TESTING.md](../blob/main/TESTING.md) for a 15-minute test round. Please remove your user name from the log before attaching it.
+  - type: input
+    id: setup
+    attributes:
+      label: Setup
+      description: Game edition and language, Windows (or Linux) version, Athelas version.
+      placeholder: "Italian edition, Windows 11, Athelas 1.6.0"
+    validations:
+      required: true
+  - type: input
+    id: players
+    attributes:
+      label: Players and controllers
+      placeholder: "4 players, 2x DualSense + 2x Xbox"
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: What you tried
+      description: Levels, co-op or Versus, number of players, anything unusual.
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: What happened
+      description: What worked and what did not.
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: ROTKPlus.log
+      description: Drag the file here (after removing your user name). If it is short, you can paste it.
