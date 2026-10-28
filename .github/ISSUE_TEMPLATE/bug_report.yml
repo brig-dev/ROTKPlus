@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thank you for reporting. Please attach `ROTKPlus.log` (copy it before restarting the game, and remove your user name from it).
+        Thank you for reporting. Please attach the log of the session (`ROTKPlus_logs` folder; every start of the game writes a new one) and remove your user name from it (`tools/check_log.py --redact` does it).
   - type: input
     id: setup
     attributes:
@@ -30,5 +30,5 @@ body:
   - type: textarea
     id: log
     attributes:
-      label: ROTKPlus.log
+      label: ROTKPlus log (ROTKPlus_logs)
       description: Drag the file here (after removing your user name).

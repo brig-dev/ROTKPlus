@@ -47,3 +47,12 @@ VictoryKey=0
 ; for testing only: 1 = players 2, 3 and 4 are driven by the keyboard, so the co-op can be tried without any controller
 ; (player 1 uses the game's own keyboard and mouse). Keys: see the top of src/Sim.cpp
 SimPads=0
+
+[Log]
+; Every start of the game writes a new log, ROTKPlus_logs\ROTKPlus_<date>_<time>.log, and leaves the earlier ones alone.
+; ROTKPlus.log in the game folder is a copy of the latest session. Attach the log of the session you are reporting.
+; Detail: 1 = also a snapshot of the players every 60 s and the game's statistics at the start and end of levels
+; (a few lines per minute); 0 = only the events
+Detail=1
+; Keep: how many session logs to keep; 0 = never delete (a session log is usually 50-150 KB)
+Keep=0

@@ -97,6 +97,7 @@ static void BeginTurn(int mode, int slot)
     g_savedOwn2 = *kOwnProfile2;
     *kChoice2 = g_lastHero[slot];
     *kOwnProfile2 = 0;
+    if (mode == 2) LogStats("end-of-level screens");
     Log("screens: turn of player %d (hero %d) in mode %d, pad %s", slot + 1, g_lastHero[slot], mode,
         PadConnected(slot) ? "its own" : "player 2's (pad not connected)");
 }

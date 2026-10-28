@@ -273,12 +273,16 @@ static void __cdecl EndSpawn(int k)
     }
     // Zero the extra player's per-level statistics: the game does it for players 1 and 2 when a level starts, not for
     // the others (a third player could start a level with the kills and experience of the previous one). In-game
-    // record 0x5BE05C + hero * 0x3C: dword 8 = experience gained in the level, 12-14 = kills.
+    // record 0x5BE05C + hero * 0x3C: dword 8 = experience gained in the level, 11-14 = kills rated Perfect ("Superbo"
+    // in Italian), Excellent, Good and Fair (see Support.cpp). Dwords 6 (level) and 7 (total experience) are the hero's
+    // own and are kept. Until 1.1.0-dev dword 11 was not cleared: an extra player started a level with the Perfect kills
+    // of an earlier one (52 for Legolas after a reload of the South Gate).
+    if (k == 1) LogStats("level start, before the extra players' statistics are reset");
     if (g_hero[slot] >= 0) {
         uint32_t* r = (uint32_t*)(0x5BE05C + g_hero[slot] * 0x3C);
-        Log("co-op: level statistics of player %d reset (experience %g, kills %u+%u+%u)", slot + 1,
-            *(const float*)(r + 8), r[12], r[13], r[14]);
-        r[8] = r[12] = r[13] = r[14] = 0;
+        Log("co-op: level statistics of player %d reset (experience %g, kills %u/%u/%u/%u)", slot + 1,
+            *(const float*)(r + 8), r[11], r[12], r[13], r[14]);
+        r[8] = r[11] = r[12] = r[13] = r[14] = 0;
     }
     Log("co-op: %d players in the game, shared lives %d", *(const int*)0x579B2C, *(const int*)0x579B28);
     if (k == 2 || g_hero[3] < 0) {   // last spawn: tell the screens who the extra players are, log the picture

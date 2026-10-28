@@ -6,13 +6,13 @@ A full round takes about 15 minutes. You do not have to do everything: do what y
 ## What you need
 
 - The game (version 1.0, the one Athelas calls "Game v1.0") and Athelas / ROTK Fix set up for it.
-- ROTKPlus installed (see the README). Check that `ROTKPlus.log` appears in the game folder after the first start.
+- ROTKPlus installed (see the README). Check that a log appears in the `ROTKPlus_logs` folder of the game folder after the first start (`ROTKPlus.log` is a copy of the latest).
 - One controller per player. Two players can share a keyboard only for the first player; see the README for the test mode
   without controllers (`SimPads`), which is also welcome.
 
 ## A quick test round
 
-1. **Start the game from Athelas.** In `ROTKPlus.log`, look for the lines "active": any line with `ERROR`, `NOT installed`
+1. **Start the game from Athelas.** In the new log (or in `ROTKPlus.log`), look for the lines "active": any line with `ERROR`, `NOT installed`
    or `CRASH` is important.
 2. **Main menu.** Do you see "Co-op: N players" and below it "Versus: N players" (or the equivalents in your language)? Do
    left/right cycle through 2, 3 and 4? Do the entries show your language?
@@ -36,19 +36,21 @@ A full round takes about 15 minutes. You do not have to do everything: do what y
 
 ## Check your log in a few seconds
 
-`tools/check_log.py` reads `ROTKPlus.log` and tells you the ROTKPlus version, which patches were installed, any `ERROR`, `NOT installed` or `CRASH` lines and what you played. It needs only Python 3 (no extra packages):
+`tools/check_log.py` reads a log and tells you the ROTKPlus version, which patches were installed, any `ERROR`, `NOT installed` or `CRASH` lines and what you played. It needs only Python 3 (no extra packages):
 
 ```
-python tools\check_log.py C:\Games\ROTK\ROTKPlus.log --redact ROTKPlus_redacted.log
+python tools\check_log.py C:\Games\ROTK --redact ROTKPlus_redacted.log
 ```
 
-`--redact` writes a copy with your Windows user name removed from the paths, ready to attach to a report. If the summary says `OK`, the mod installed correctly on your setup and the interesting part of your report is how the game behaved.
+Give it the game folder to read the newest session, or the path of any log in `ROTKPlus_logs`. `--redact` writes a copy with your Windows user name removed from the paths, ready to attach to a report. If the summary says `OK`, the mod installed correctly on your setup and the interesting part of your report is how the game behaved.
 
 ## How to report
 
-Open an issue (there are forms for a **test report** and for a **bug**) and attach `ROTKPlus.log` (and `ROTKFix.log` if the
-game crashed). The log is rewritten every time the game starts, so copy it before restarting. **Remove your user name
-from the log first**: it shows the path of your game folder. Tell us:
+Open an issue (there are forms for a **test report** and for a **bug**) and attach the log of the session you are
+reporting: the file in `ROTKPlus_logs` whose name has the date and time you played (each start of the game makes a new
+one, and older ones are kept). Attach `ROTKFix.log` too if the game crashed: that one is written by ROTK Fix and is
+overwritten at every start, so copy it before restarting. **Remove your user name from the log first** (`--redact` of
+`check_log.py` does it): it shows the path of your game folder. Tell us:
 
 - game edition / language, Windows version, Athelas version;
 - number of players and the controllers you used;

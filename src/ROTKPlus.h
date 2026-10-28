@@ -15,7 +15,7 @@
 #include <stdint.h>
 #include <string>
 
-#define ROTKPLUS_VERSION "1.0.0"
+#define ROTKPLUS_VERSION "1.1.0"
 
 // Call a naked trampoline (one that continues into the game's code) from C++: GameFn((type)&Trampoline)(...).
 // When it sees a static naked function in the same translation unit, MSVC may assume that it does not touch the
@@ -27,6 +27,8 @@ template <class F> inline F GameFn(F f) { F volatile v = f; return v; }
 
 // --- Main.cpp: log, game folder, writing into the game's code ------------------------------------------------
 void        Log(const char* fmt, ...);
+bool        LogDetail();                       // [Log] Detail: 1 = periodic snapshots and statistics dumps (default)
+void        LogStats(const char* when);        // Support.cpp: the game's per-hero statistics records
 const char* GameDir();
 // Writes n bytes at addr if the current bytes are the expected ones (expect, n bytes). Returns false otherwise.
 bool        Patch(uintptr_t addr, const void* expect, const void* data, size_t n);

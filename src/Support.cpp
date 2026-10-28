@@ -4,6 +4,7 @@
 #include "ROTKPlus.h"
 #include <stdio.h>
 #include <string.h>
+#include <string>
 
 void ScreensFrame();   // Screens.cpp
 
@@ -89,9 +90,98 @@ static void EndLevel(const char* why)
     GameFn(&EndLevelNow)(g_endMsg);
 }
 
+// --- detailed log: statistics and snapshots -------------------------------------------------------------------------
+// The per-hero statistics records are at 0x5BE05C + hero * 0x3C (15 dwords). Compared with the score screen: dword 6 is
+// the hero's level (float), 7 the total experience (float), 8 the experience of the current level (float), 11-14 the
+// kills of the level by rating: Perfect, Excellent, Good, Fair ("Superbo", "Ottimo", "Buono", "Medio" in Italian). The
+// other dwords are not understood yet: they are dumped as they are, so that a problem with the counters can be studied
+// from the log.
+extern uint32_t g_players[8];   // Coop.cpp
+static const char* const kStatNames[9] = { "Aragorn", "Legolas", "Gimli", "Gandalf", "Sam", "Frodo", "Pippin", "Merry", "Faramir" };
+
+// copies the record of a hero (a function of its own: __try cannot share a function with objects that need unwinding)
+static bool ReadRecord(int hero, uint32_t out[15])
+{
+    __try {
+        memcpy(out, (const void*)(0x5BE05C + hero * 0x3C), 15 * sizeof(uint32_t));
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+
+void LogStats(const char* when)
+{
+    if (!LogDetail()) return;
+    // the records are built first, so that a periodic snapshot with nothing new does not repeat them
+    static std::string last;
+    std::string text;
+    for (int h = 0; h < 9; ++h) {
+        uint32_t r[15];
+        if (!ReadRecord(h, r)) { Log("stats (%s): unreadable", when); return; }
+        bool any = false;
+        char buf[256]; int n = 0;
+        for (int i = 0; i < 15; ++i) {
+            if (r[i]) any = true;
+            n += sprintf_s(buf + n, sizeof buf - n, " %X", r[i]);
+        }
+        if (!any) continue;
+        char line[400];
+        sprintf_s(line, "    %s: experience %g kills %u/%u/%u/%u raw%s\n", kStatNames[h], *(const float*)(r + 8), r[11], r[12], r[13],
+                  r[14], buf);
+        text += line;
+    }
+    const bool snapshot = !strcmp(when, "snapshot");
+    if (snapshot && text == last) { Log("stats (snapshot): unchanged"); return; }
+    last = text;
+    Log("stats (%s):", when);
+    for (size_t p = 0; p < text.size();) {
+        const size_t e = text.find('\n', p);
+        Log("%s", text.substr(p, e - p).c_str());
+        p = e + 1;
+    }
+}
+
+// Every 60 s in a level: where the players are and their statistics. Also notes when a player's "down" flag (+0x810:
+// dead or waiting to respawn) changes, with the position, to help with deaths in odd places.
+static void LogSnapshots()
+{
+    static DWORD last;
+    static uint32_t seen[4];
+    static uint8_t down[4];
+    const DWORD now = GetTickCount();
+    bool changed = false;
+    for (int i = 0; i < 4; ++i) {
+        const uint32_t c = g_players[i];
+        if (c != seen[i]) { seen[i] = c; down[i] = 0; changed = true; }
+        if (!c) continue;
+        __try {
+            const uint8_t d = *(const uint8_t*)(c + 0x810);
+            if (d != down[i]) {
+                const float* p = (const float*)(c + 0x30);
+                Log("player %d: down flag %d -> %d at (%.1f, %.1f, %.1f)", i + 1, down[i], d, p[0], p[1], p[2]);
+                down[i] = d;
+            }
+        } __except (EXCEPTION_EXECUTE_HANDLER) {}
+    }
+    if (changed) last = now;
+    if (now - last < 60000) return;
+    last = now;
+    char line[256]; int n = 0;
+    for (int i = 0; i < 4; ++i) {
+        if (!g_players[i]) continue;
+        __try {
+            const float* p = (const float*)(g_players[i] + 0x30);
+            n += sprintf_s(line + n, sizeof line - n, " P%d(%.0f,%.0f,%.0f)%s", i + 1, p[0], p[1], p[2], down[i] ? "*" : "");
+        } __except (EXCEPTION_EXECUTE_HANDLER) {}
+    }
+    if (!n) return;
+    Log("snapshot:%s  (* = down)", line);
+    LogStats("snapshot");
+}
+
 void SupportFrame()   // from Pads.cpp, every frame, on the game's thread
 {
     static bool down;
+    if (LogDetail() && InLevel()) LogSnapshots();
     if (g_endPending && InLevel()) {
         g_endPending = false;
         EndLevel("requested");

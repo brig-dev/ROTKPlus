@@ -4,23 +4,100 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
+#include <string>
+#include <vector>
+#include <algorithm>
 
 static char             g_dir[MAX_PATH];
 static CRITICAL_SECTION g_logCs;
-static FILE*            g_log;
+static FILE*            g_log;        // this session's own file: ROTKPlus_logs\ROTKPlus_<date>_<time>.log
+static FILE*            g_logLatest;  // ROTKPlus.log: a copy of the latest session, always in the same place
+static bool             g_detail = true;
+static DWORD            g_startTick;
 
 const char* GameDir() { return g_dir; }
+bool LogDetail() { return g_detail; }
 
 void Log(const char* fmt, ...)
 {
-    if (!g_log) return;
+    if (!g_log && !g_logLatest) return;
     EnterCriticalSection(&g_logCs);
     SYSTEMTIME t; GetLocalTime(&t);
-    fprintf(g_log, "[%02d:%02d:%02d.%03d] ", t.wHour, t.wMinute, t.wSecond, t.wMilliseconds);
-    va_list ap; va_start(ap, fmt); vfprintf(g_log, fmt, ap); va_end(ap);
-    fputc('\n', g_log);
-    fflush(g_log);
+    char line[1024];
+    int n = sprintf_s(line, "[%02d:%02d:%02d.%03d] ", t.wHour, t.wMinute, t.wSecond, t.wMilliseconds);
+    va_list ap; va_start(ap, fmt);
+    const int room = (int)sizeof line - n - 2;
+    const int m = vsnprintf(line + n, room, fmt, ap);
+    va_end(ap);
+    n += (m < 0 || m >= room) ? room - 1 : m;
+    line[n++] = '\n';
+    for (FILE* f : { g_log, g_logLatest }) if (f) { fwrite(line, 1, n, f); fflush(f); }
     LeaveCriticalSection(&g_logCs);
+}
+
+// Opens a new log file for this session without touching the earlier ones, and refreshes ROTKPlus.log.
+static void OpenLogs()
+{
+    char dir[MAX_PATH], path[MAX_PATH];
+    sprintf_s(dir, "%s\\ROTKPlus_logs", g_dir);
+    CreateDirectoryA(dir, nullptr);
+    SYSTEMTIME t; GetLocalTime(&t);
+    for (int k = 0; k < 100 && !g_log; ++k) {
+        char suffix[8] = ""; if (k) sprintf_s(suffix, "_%d", k + 1);
+        sprintf_s(path, "%s\\ROTKPlus_%04d-%02d-%02d_%02d-%02d-%02d%s.log", dir, t.wYear, t.wMonth, t.wDay,
+                  t.wHour, t.wMinute, t.wSecond, suffix);
+        if (GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES) continue;   // restarted within the same second
+        fopen_s(&g_log, path, "w");
+    }
+    sprintf_s(path, "%s\\ROTKPlus.log", g_dir);
+    fopen_s(&g_logLatest, path, "w");
+}
+
+// [Log] Keep=N: keeps only the N newest session files (0, the default, never deletes anything).
+static void DeleteOldLogs(int keep)
+{
+    if (keep <= 0) return;
+    char pattern[MAX_PATH];
+    sprintf_s(pattern, "%s\\ROTKPlus_logs\\ROTKPlus_*.log", g_dir);
+    std::vector<std::string> names;
+    WIN32_FIND_DATAA fd;
+    HANDLE h = FindFirstFileA(pattern, &fd);
+    if (h == INVALID_HANDLE_VALUE) return;
+    do names.push_back(fd.cFileName); while (FindNextFileA(h, &fd));
+    FindClose(h);
+    std::sort(names.begin(), names.end());   // the names start with the date: oldest first
+    for (size_t i = 0; i + keep < names.size(); ++i) {
+        char p[MAX_PATH]; sprintf_s(p, "%s\\ROTKPlus_logs\\%s", g_dir, names[i].c_str());
+        DeleteFileA(p);
+    }
+}
+
+// The first lines of every session: the setup, so that a report does not need to ask for it.
+static void LogSessionHeader()
+{
+    SYSTEMTIME t; GetLocalTime(&t);
+    Log("session start %04d-%02d-%02d %02d:%02d:%02d", t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond);
+    HMODULE nt = GetModuleHandleA("ntdll.dll");
+    typedef const char*(__cdecl* WineVer)(void);
+    typedef LONG(WINAPI* RtlVer)(OSVERSIONINFOW*);
+    WineVer wine = nt ? (WineVer)GetProcAddress(nt, "wine_get_version") : nullptr;
+    RtlVer rtl = nt ? (RtlVer)GetProcAddress(nt, "RtlGetVersion") : nullptr;
+    OSVERSIONINFOW os = { sizeof os };
+    if (rtl) rtl(&os);
+    SYSTEM_INFO si; GetNativeSystemInfo(&si);
+    if (wine) Log("system: Wine/Proton %s (reports Windows %lu.%lu build %lu), %lu logical CPUs", wine(),
+                  os.dwMajorVersion, os.dwMinorVersion, os.dwBuildNumber, si.dwNumberOfProcessors);
+    else      Log("system: Windows %s (version %lu.%lu build %lu), %lu logical CPUs",
+                  os.dwBuildNumber >= 22000 ? "11" : os.dwMajorVersion >= 10 ? "10" : "older than 10",
+                  os.dwMajorVersion, os.dwMinorVersion, os.dwBuildNumber, si.dwNumberOfProcessors);
+    for (const char* name : { "ROTKFix.dll", "SDL3.dll", "d3d8.dll", "dinput8.dll", "DivxMediaLib_orig.dll" }) {
+        char p[MAX_PATH]; sprintf_s(p, "%s\\%s", g_dir, name);
+        WIN32_FILE_ATTRIBUTE_DATA a;
+        if (GetFileAttributesExA(p, GetFileExInfoStandard, &a)) {
+            SYSTEMTIME w; FileTimeToSystemTime(&a.ftLastWriteTime, &w);
+            Log("file: %s %lu bytes, modified %04d-%02d-%02d", name, a.nFileSizeLow, w.wYear, w.wMonth, w.wDay);
+        } else Log("file: %s not present", name);
+    }
 }
 
 static bool WriteCode(uintptr_t addr, const void* data, size_t n)
@@ -129,11 +206,14 @@ void SupportInstall(bool victoryKey);   // Support.cpp
 
 static void Start()
 {
-    char log[MAX_PATH];
-    sprintf_s(log, "%s\\ROTKPlus.log", g_dir);
-    fopen_s(&g_log, log, "w");
+    g_startTick = GetTickCount();
+    g_detail = IniInt("Log", "Detail", 1) != 0;
+    OpenLogs();
+    DeleteOldLogs(IniInt("Log", "Keep", 0));
     Log("ROTKPlus %s", ROTKPLUS_VERSION);
     Log("game folder: %s", g_dir);
+    LogSessionHeader();
+    Log("log: detail %d, keep %d session files (0 = all)", g_detail, IniInt("Log", "Keep", 0));
     if ((uintptr_t)GetModuleHandleA(NULL) != 0x400000 || !GameIsSupported()) {
         Log("rotk.exe not recognised (version 1.0, 1,703,936 bytes, is required): nothing was changed");
         return;
@@ -155,6 +235,11 @@ BOOL APIENTRY DllMain(HMODULE mod, DWORD reason, LPVOID)
         GetModuleFileNameA(mod, g_dir, MAX_PATH);
         if (char* s = strrchr(g_dir, '\\')) *s = 0;
         Start();
+    } else if (reason == DLL_PROCESS_DETACH) {
+        __try {
+            const DWORD s = (GetTickCount() - g_startTick) / 1000;
+            Log("session end after %lu min %lu s", s / 60, s % 60);
+        } __except (EXCEPTION_EXECUTE_HANDLER) {}
     }
     return TRUE;
 }

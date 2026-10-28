@@ -12,11 +12,13 @@ ROTKPlus is a small DLL, not a replacement for the game. It works together with
 changes nothing on disk except the file it replaces (see *Installation*).
 
 **Download:** [GitHub Releases](https://github.com/brig-dev/ROTKPlus/releases) or
-[ModDB](https://www.moddb.com/mods/rotkplus/downloads) (same file). Mod page: <https://www.moddb.com/mods/rotkplus>
+[ModDB](https://www.moddb.com/mods/rotkplus/downloads) (same file). Mod page: <https://www.moddb.com/mods/rotkplus>. What changed: [CHANGELOG.md](CHANGELOG.md)
 
-> **Status:** version 1.0.0, tested on Windows 11 with Athelas 1.5 (everything) and Athelas 1.6.0 (the game starts, all
-> the patches install and the menu works; gameplay was not tried on 1.6), the Italian edition of the game, and up to four
-> controllers. Not tested on Linux / Steam Deck (Proton). English is the default
+> **Status:** version 1.1.0. ROTKPlus 1.0.0 was tested on Windows 11 with Athelas 1.5 and 1.6.0, the Italian edition of
+> the game and up to four controllers, and on SteamOS (Proton) with Athelas 1.6.0: about two hours of the campaign with
+> three controllers and the Versus mode with three players. The changes of 1.1.0 (session logs, a statistics fix) were
+> tested on Windows 11 with Athelas 1.6.0 and keyboard-simulated players (see *Testing without controllers*). Not tested
+> on the Steam Deck. English is the default
 > language of the mod's own texts; Italian was verified in the game; French, German and Spanish are untested
 > translations (see *Language*).
 
@@ -50,7 +52,7 @@ changes nothing on disk except the file it replaces (see *Installation*).
 
 ## Installation
 
-Download `ROTKPlus-1.0.0.zip` from [GitHub Releases](https://github.com/brig-dev/ROTKPlus/releases) or from
+Download `ROTKPlus-1.1.0.zip` from [GitHub Releases](https://github.com/brig-dev/ROTKPlus/releases) or from
 [ModDB](https://www.moddb.com/mods/rotkplus/downloads), then:
 
 1. Close the game. Make a backup copy of the game folder if you wish.
@@ -61,9 +63,23 @@ Download `ROTKPlus-1.0.0.zip` from [GitHub Releases](https://github.com/brig-dev
 4. Copy `ROTKPlus.ini` from the zip next to `rotk.exe`; it already has `[Coop] Enabled=1`. If you built the mod yourself,
    copy `config/ROTKPlus.ini.example` and rename it `ROTKPlus.ini` (it has the same defaults). Without the ini file the
    mod stays **off**; `Enabled=0` turns it off again.
-5. Start the game through Athelas as usual. `ROTKPlus.log` in the game folder tells you what happened.
+5. Start the game through Athelas as usual. Every start writes a new log in `ROTKPlus_logs` (game folder), named with
+   the date and time, and never overwrites the earlier ones; `ROTKPlus.log` is a copy of the latest. See *Logs*.
 
 To remove it, delete ROTKPlus's `DivxMediaLib.dll` and rename `DivxMediaLib_orig.dll` back.
+
+## Logs
+
+Each start of the game creates `ROTKPlus_logs\ROTKPlus_<date>_<time>.log` and keeps the older ones, so after a long
+session you can still find the log of last night. `ROTKPlus.log` next to `rotk.exe` is a copy of the latest session. The
+log starts with the setup (ROTKPlus version, Windows or Wine/Proton, sizes of the ROTK Fix files), then records every
+patch, the menu choices, the heroes, deaths and falls, and, with `[Log] Detail=1` (the default), a snapshot of the players
+every minute and the game's statistics at the start and end of each level (a few lines a minute, nothing heavy). A line
+`session end` closes the file when the game exits normally. `[Log] Keep=N` in `ROTKPlus.ini` keeps only the N newest
+files (default 0: nothing is ever deleted; a session is usually 50-150 KB). `ROTKFix.log` is written by ROTK Fix and is
+overwritten at every start: copy it yourself if you need it.
+
+`tools/check_log.py` summarises a log in a few seconds (see [TESTING.md](TESTING.md)).
 
 ## Using it
 
@@ -125,7 +141,7 @@ was learnt about the game's internals (addresses are for `rotk.exe` 1.0); it may
 This is a one-person hobby project, and it has been tested on very few setups. **Any help is very welcome:**
 
 - **Testing.** Try it with your own controllers and edition of the game, with 3 and 4 players, in different levels, in the
-  Versus mode, and on Linux / Steam Deck (Proton). Tell us what works and what does not, with `ROTKPlus.log` attached.
+  Versus mode, and on Linux / Steam Deck (Proton). Tell us what works and what does not, with the log of that session (`ROTKPlus_logs`) attached.
   There is a 15-minute test round in [TESTING.md](TESTING.md) and a **test report** form when you open an issue.
 - **Improvements and integrations.** Ideas that would be great: team play (2 against 2) in Versus mode, a Versus ending that
   does not go through the co-op screens, a "defeated" caption for eliminated players, separate save profiles for the extra

@@ -2,13 +2,13 @@
 
 Thank you for looking at ROTKPlus. The most useful things you can do:
 
-1. **Report a problem.** Open an issue and attach `ROTKPlus.log` (it is rewritten at every start of the game, so
-   copy it before restarting). Say which game edition and language you use, how many players and controllers, which
+1. **Report a problem.** Open an issue and attach the log of that session (`ROTKPlus_logs`: every start of the game
+   writes a new file and keeps the old ones). Say which game edition and language you use, how many players and controllers, which
    level, and what you did just before. A screenshot helps. Please remove anything personal from the log first (the log
    shows your game folder path).
 2. **Translate.** The mod writes six short texts. Add a section for your language to `config/ROTKPlus.lang.ini.example`
    and, if it is verified in the game, to the table in `src/Lang.cpp`.
-3. **Test on other setups.** Linux / Steam Deck (Proton), other editions of the game, Athelas versions newer than 1.5.
+3. **Test on other setups.** Steam Deck and other Linux setups (Proton), other editions of the game, Athelas versions newer than 1.6.0.
 4. **Fix or extend the code.** Open an issue first for anything bigger than a small fix, so the work is not wasted.
 
 ## Notes for code changes

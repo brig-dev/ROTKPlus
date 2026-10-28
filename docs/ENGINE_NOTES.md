@@ -25,6 +25,10 @@ specification: if you find an error, please open an issue.
 - Seven other tables hold one row per player (2 rows): bases `0x578E60`, `0x578E68`, `0x578E70`, `0x578E80` (100-byte
   rows), `0x99DB80` (0x144-byte rows), `0x579B30`, `0x579B38`. A third row used to land on the difficulty table
   `0x578F48` and a memory-pool pointer (`Coop.cpp` moves them).
+- Per-hero statistics: record of 15 dwords at `0x5BE05C + hero * 0x3C`, kept between levels (apparently also in the save
+  game). Dword 6 the hero's level (float), 7 the total experience (float), 8 the experience of the current level (float),
+  11-14 the kills of the level by rating (Perfect, Excellent, Good, Fair); the others are not understood. The game
+  appears to clear 8 and 11-14 only for the heroes of players 1 and 2 when a level starts.
 - Input records: block of 4 players at `0x8E7E60` (0x24690 bytes each), configured by `[inputN]` sections of `ROTK.ini`;
   only two are initialised by `0x4AC890` (calls `0x4AC670(0,1)` and `0x4AC670(1,0)`). Per-player controller record at
   `0x99CBA0 + n*0x58` (`0x49D490(n)`): sticks, buttons at `+0x40/+0x42`, button bit table `0x99CB60`.
