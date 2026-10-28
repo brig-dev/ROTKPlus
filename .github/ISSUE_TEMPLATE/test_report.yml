@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thank you for testing! See [TESTING.md](../blob/main/TESTING.md) for a 15-minute test round. Please attach the log of the session you tested (`ROTKPlus_logs` folder) and remove your user name from it first.
+        Thank you for testing! See [TESTING.md](https://github.com/brig-dev/ROTKPlus/blob/main/TESTING.md) for a test round (even its first steps help). Please attach the log of the session you tested (`ROTKPlus_logs` folder) and remove your user name from it first: [check_log.py](https://raw.githubusercontent.com/brig-dev/ROTKPlus/main/tools/check_log.py) `--redact` does it for you.
   - type: input
     id: setup
     attributes:

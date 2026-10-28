@@ -76,10 +76,11 @@ log starts with the setup (ROTKPlus version, Windows or Wine/Proton, sizes of th
 patch, the menu choices, the heroes, deaths and falls, and, with `[Log] Detail=1` (the default), a snapshot of the players
 every minute and the game's statistics at the start and end of each level (a few lines a minute, nothing heavy). A line
 `session end` closes the file when the game exits normally. `[Log] Keep=N` in `ROTKPlus.ini` keeps only the N newest
-files (default 0: nothing is ever deleted; a session is usually 50-150 KB). `ROTKFix.log` is written by ROTK Fix and is
+files (default 0: nothing is ever deleted; a session of an hour is usually well under 100 KB). `ROTKFix.log` is written by ROTK Fix and is
 overwritten at every start: copy it yourself if you need it.
 
-`tools/check_log.py` summarises a log in a few seconds (see [TESTING.md](TESTING.md)).
+`tools/check_log.py` (Python 3) summarises a log in a few seconds and can remove your user name from it before you post
+it; [TESTING.md](TESTING.md) explains how to download and run it.
 
 ## Using it
 
@@ -91,8 +92,18 @@ Key `F9` (only if `[Diag] VictoryKey=1`) ends the level with a victory: useful t
 
 ### Testing without controllers
 
-With `[Debug] SimPads=1` players 2, 3 and 4 are driven by the keyboard (keys at the top of `src/Sim.cpp`) and the game
-offers the Co-op entry even with no controller connected; player 1 uses the game's own keyboard and mouse controls.
+With `[Debug] SimPads=1` in `ROTKPlus.ini` players 2, 3 and 4 are driven by the keyboard and the game offers the Co-op
+entry even with no controller connected; player 1 uses the game's own keyboard and mouse controls. Start the game from
+Athelas with no controller connected. The keys work only while the game window has the focus:
+
+| Player | Move | Cross (fast attack) | Circle (heavy attack) | Square (parry) | Triangle (fierce attack) | R2 (execution) |
+|---|---|---|---|---|---|---|
+| 2 | arrow keys | Right Ctrl | Right Shift | Delete | End | Page Down |
+| 3 | I J K L | U | O | P | Y | H |
+| 4 | numpad 8 4 5 6 (Num Lock on) | Num 0 | Num . | Num 1 | Num 2 | Num 3 |
+
+In the menus (hero selection, score, statistics, shop), during the turn of player 3 or 4 the keys of player 1 also work for
+them: W A S D to move, Enter or Space to confirm, Escape or Backspace to go back.
 One person can drive one character at a time, which is enough to look at the creation of the players, the HUD, deaths and
 respawns, the hero selection and the end-of-level screens. It is a testing aid, not a way to play.
 
@@ -141,8 +152,9 @@ was learnt about the game's internals (addresses are for `rotk.exe` 1.0); it may
 This is a one-person hobby project, and it has been tested on very few setups. **Any help is very welcome:**
 
 - **Testing.** Try it with your own controllers and edition of the game, with 3 and 4 players, in different levels, in the
-  Versus mode, and on Linux / Steam Deck (Proton). Tell us what works and what does not, with the log of that session (`ROTKPlus_logs`) attached.
-  There is a 15-minute test round in [TESTING.md](TESTING.md) and a **test report** form when you open an issue.
+  Versus mode, and on the Steam Deck or other Linux setups (Proton). Tell us what works and what does not, with the log
+  of that session (`ROTKPlus_logs`) attached. [TESTING.md](TESTING.md) has a test round (even its first steps help), the
+  log checker, and how to report; there is a **test report** form when you open an issue.
 - **Improvements and integrations.** Ideas that would be great: team play (2 against 2) in Versus mode, a Versus ending that
   does not go through the co-op screens, a "defeated" caption for eliminated players, separate save profiles for the extra
   players, integration with Athelas / ROTK Fix's own mod system. Pull requests and suggestions are both welcome.

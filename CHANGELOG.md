@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- `tools/check_log.py --redact` also removes the user name from Linux paths (Proton: `Z:\home\<name>`, `/home/<name>`).
+- `TESTING.md`: how to download and run `check_log.py` without the source code; the round is described more honestly
+  (about 45 minutes, even the first steps help). README: the keys of the test mode without controllers.
+
 ## 1.1.0
 
 - **A log for every session.** Each start of the game writes a new log, `ROTKPlus_logs\ROTKPlus_<date>_<time>.log` in

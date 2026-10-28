@@ -7,7 +7,8 @@ Since 1.1 every start of the game writes its own log, ROTKPlus_logs\\ROTKPlus_<d
 of the latest one. Give the path of a log, or of the game folder (or of ROTKPlus_logs) to read the newest session.
 Without a path it looks in the current folder. It tells you the ROTKPlus version, which patches were
 installed, any ERROR / NOT installed / CRASH lines, what was played (modes, players, levels) and gives a verdict.
-With --redact it also writes a copy of the log with the user name in Windows paths replaced, ready to attach to a report.
+With --redact it also writes a copy of the log with the user name in paths (Windows, or Linux under Proton) replaced,
+ready to attach to a report.
 Exit code: 0 = no problems found, 1 = warnings, 2 = errors or crash, 3 = unreadable or not a ROTKPlus log.
 """
 import glob
@@ -47,7 +48,9 @@ EXPECTED = [
 MENU_BAD = "main menu: choice of the number of players NOT installed"
 
 LINE = re.compile(r"^\[(\d\d:\d\d:\d\d\.\d{3})\] ?(.*)$")
-USER_PATH = re.compile(r"(?i)([A-Z]:\\Users\\)([^\\/\r\n\"]+)")
+# A user name inside a path: the Users folder of a Windows drive, or the home folder under Wine / Proton (Linux, Steam
+# Deck: Z:\home\<name> or /home/<name>). The prefix is kept and the name is replaced by USER.
+USER_PATH = re.compile(r"(?i)([A-Z]:\\(?:Users|home)\\|/home/)([^\\/\r\n\"]+)")
 
 
 def read_log(path):
@@ -106,7 +109,7 @@ def main(argv):
     if folder:
         print(f"Game folder: {folder}")
         if USER_PATH.search(folder):
-            warnings.append("the log contains your Windows user name in a path; use --redact before posting it")
+            warnings.append("the log contains your user name in a path; use --redact before posting it")
     # Session information (ROTKPlus 1.1 and later)
     started = next((t for t in texts if t.startswith("session start ")), None)
     if started:

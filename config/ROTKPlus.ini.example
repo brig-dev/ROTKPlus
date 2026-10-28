@@ -54,5 +54,5 @@ SimPads=0
 ; Detail: 1 = also a snapshot of the players every 60 s and the game's statistics at the start and end of levels
 ; (a few lines per minute); 0 = only the events
 Detail=1
-; Keep: how many session logs to keep; 0 = never delete (a session log is usually 50-150 KB)
+; Keep: how many session logs to keep; 0 = never delete (an hour of play is usually well under 100 KB)
 Keep=0
