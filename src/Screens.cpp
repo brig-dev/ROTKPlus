@@ -415,11 +415,20 @@ static const char* ElemName(uint32_t e)
 }
 
 static DWORD g_leftDownAt;   // the last press of the left button (ClickLogMouse, every frame)
+static bool  g_leftDownWas;  // the button at the last frame
 static DWORD g_screenAt;     // the last change of screen (SetMode, or the screen's root in ScreensFrame)
+
+// the left button pressed a moment ago: down at this frame for the first time, or pressed less than 300 ms ago. A
+// button that is only down does not count: after Alt+Tab Windows may keep it down for good (Players.cpp, FromLeftClick)
+static bool LeftJustPressed()
+{
+    const bool down = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
+    return (down && !g_leftDownWas) || (g_leftDownAt && GetTickCount() - g_leftDownAt < 300);
+}
 
 static void ClickLogMouse()
 {
-    static bool was;
+    bool& was = g_leftDownWas;
     const bool down = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
     if (down && !was) g_leftDownAt = GetTickCount() | 1;
     if (down == was || g_clickLog >= ClickLogMax) { was = down; return; }
@@ -1183,10 +1192,9 @@ static void __cdecl ActionFilter(int action)
     // The left mouse button is also a key of player 1 (quick attack, "PSM" in Options), and in the menus it confirms
     // the entry selected by the keys: a click on Options opened Options through the pointer and, at the same time,
     // confirmed Single, the entry the keys had selected (a tester's reading of the test of 30/10/2026, and the log). Out of
-    // our pages the pointer does the click by itself, so a confirm from slot 0 while the left button is down, or was
-    // pressed a moment ago, with neither Enter nor Space held, is dropped. (On our pages the click is taken from it.)
-    if (action == 7 && *(const uint8_t*)0x8E2111 == 0 && !PlayersPageOpen() &&
-        ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) || (g_leftDownAt && GetTickCount() - g_leftDownAt < 300)) &&
+    // our pages the pointer does the click by itself, so a confirm from slot 0 when the left button was just pressed,
+    // with neither Enter nor Space held, is dropped. (On our pages the click is taken from it.)
+    if (action == 7 && *(const uint8_t*)0x8E2111 == 0 && !PlayersPageOpen() && LeftJustPressed() &&
         !(GetAsyncKeyState(VK_RETURN) & 0x8000) && !(GetAsyncKeyState(VK_SPACE) & 0x8000)) {
         static int logged;
         if (logged++ < 8) Log("menu: confirm of the left mouse button as a key dropped (mode %d)", *kMode);

@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.2.1
+
+- Fixed: on the Fellowship pages Enter sometimes did nothing, or acted on the place under the mouse pointer instead of
+  the selected entry. A left mouse button that Windows still reported as held (it can happen after Alt+Tab) made every
+  confirm look like a click. Now a click is a press of the button a moment ago, not a button that is only down, and a
+  confirm with Enter or Space held is always the keyboard's. The same check is used in the game's own menus, where a
+  held button could drop the first player's confirm.
+- Known issue: on some setups the game does not turn a left click into a confirm on the Fellowship pages and on the
+  Fellowship and Versus entries of the main menu, so the left click does nothing there. Enter and the controllers
+  always work; the pointer still selects and the right click still goes back.
+
 ## 1.2.0
 
 ### Fellowship: names and statistics

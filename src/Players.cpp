@@ -1997,6 +1997,7 @@ static void PageAction(int action, int slot);
 static bool FromLeftClick();
 static bool FromRightClick();
 static void LeftClick();
+static unsigned LeftPressedAgo();   // ms since the left button was last pressed (0: never)
 
 // the menu's actions while the page is open (Screens.cpp); onEntry = the "Players" entry is the selected one; slot = the
 // controller's slot the action comes from. true = the action was used here
@@ -2024,7 +2025,27 @@ bool PlayersMenuAction(int action, bool onEntry, int slot)
     // (the twin is dropped only among the clicks: two players' confirms, or two Enters, within 250 ms are not clicks.
     // The pointer's own confirm comes from slot 3, which is also the fourth controller's: the button decides)
     static DWORD lastClick;
-    if (action == 7 && FromLeftClick()) {
+    // a confirm with Enter or Space held is the keyboard's in any case; and a left button that is only down (see
+    // FromLeftClick) is noted, to see how often Windows keeps one down
+    const bool keyConfirm = KeyDown(VK_RETURN) || KeyDown(VK_SPACE);
+    if (action == 7 && LogDetail()) {   // what a confirm on the page looks like ([Log] Detail=1, the first 12)
+        static int logged;
+        if (logged < 12) {
+            ++logged;
+            Log("players: confirm on the page (slot %d): left button %s, pressed %u ms ago, Enter or Space %s -> %s", slot,
+                KeyDown(VK_LBUTTON) ? "down" : "up", LeftPressedAgo(), keyConfirm ? "held" : "not held",
+                !keyConfirm && FromLeftClick() ? "a click" : "the keys");
+        }
+    }
+    if (action == 7 && KeyDown(VK_LBUTTON) && !FromLeftClick()) {
+        static int logged;
+        if (logged < 5) {
+            ++logged;
+            Log("players: confirm while the left button looks held (pressed %u ms ago, slot %d, %s): not a click",
+                LeftPressedAgo(), slot, keyConfirm ? "Enter or Space held" : "no key held");
+        }
+    }
+    if (action == 7 && !keyConfirm && FromLeftClick()) {
         if (lastClick && now - lastClick < 250) return true;
         lastClick = now | 1;
         LeftClick();
@@ -2178,6 +2199,7 @@ struct ClickArea { float x0, y0, x1, y1; int kind, idx; };
 static ClickArea g_areas[96];
 static int g_nAreas;
 static DWORD g_leftAt, g_rightAt;   // when the buttons were last pressed (MouseFrame)
+static bool  g_leftWas, g_rightWas; // the buttons at the last frame (MouseFrame)
 
 static void AddHit(float x0, float y0, float x1, float y1, int kind, int idx)
 {
@@ -2214,9 +2236,20 @@ static const ClickArea* AreaAt(float x, float y)
     return nullptr;
 }
 
-// is this action of the menu the left click (or the right one)? The button is down, or was pressed a moment ago
-static bool FromLeftClick() { return KeyDown(VK_LBUTTON) || (g_leftAt && GetTickCount() - g_leftAt < 500); }
-static bool FromRightClick() { return KeyDown(VK_RBUTTON) || (g_rightAt && GetTickCount() - g_rightAt < 500); }
+// Is this action of the menu the left click (or the right one)? The button was pressed a moment ago: it went down at
+// this frame (not seen by MouseFrame yet) or less than half a second ago. A button that is only down is not a click:
+// after Alt+Tab Windows may keep a button down for good (test of 03/11/2026: the game takes the mouse back before the
+// button is released, and the release never reaches Windows), and then every Enter was taken for a click on the place
+// under the pointer, where nothing was.
+static bool FromLeftClick()
+{
+    return (KeyDown(VK_LBUTTON) && !g_leftWas) || (g_leftAt && GetTickCount() - g_leftAt < 500);
+}
+static bool FromRightClick()
+{
+    return (KeyDown(VK_RBUTTON) && !g_rightWas) || (g_rightAt && GetTickCount() - g_rightAt < 500);
+}
+static unsigned LeftPressedAgo() { return g_leftAt ? (unsigned)(GetTickCount() - g_leftAt) : 0u; }
 
 // the left click, from the menu's action: the place under the pointer (nothing if the click fell on nothing)
 static void LeftClick()
@@ -2248,13 +2281,12 @@ static void LeftClick()
 // every frame: the buttons' times, the pointer over an entry selects it, the right button goes back
 static void MouseFrame()
 {
-    static bool leftWas, rightWas;
     static float lastX = -1.0f, lastY = -1.0f;
     const bool left = KeyDown(VK_LBUTTON), right = KeyDown(VK_RBUTTON);
-    if (left && !leftWas) g_leftAt = GetTickCount() | 1;
-    const bool rightClick = right && !rightWas;
+    if (left && !g_leftWas) g_leftAt = GetTickCount() | 1;
+    const bool rightClick = right && !g_rightWas;
     if (rightClick) g_rightAt = GetTickCount() | 1;
-    leftWas = left; rightWas = right;
+    g_leftWas = left; g_rightWas = right;
     float x = 0.0f, y = 0.0f;
     if (g_page == P_CLOSED || !PointerPos(x, y)) return;
     const bool moved = fabsf(x - lastX) > 0.002f || fabsf(y - lastY) > 0.002f;

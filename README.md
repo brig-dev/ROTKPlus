@@ -14,7 +14,7 @@ changes nothing on disk except the file it replaces (see *Installation*).
 **Download:** [GitHub Releases](https://github.com/brig-dev/ROTKPlus/releases) or
 [ModDB](https://www.moddb.com/mods/rotkplus/downloads) (same file). Mod page: <https://www.moddb.com/mods/rotkplus>. What changed: [CHANGELOG.md](CHANGELOG.md)
 
-> **Status:** version 1.2.0. ROTKPlus 1.0.0 was tested on Windows 11 with Athelas 1.5 and 1.6.0, the Italian edition of
+> **Status:** version 1.2.1. ROTKPlus 1.0.0 was tested on Windows 11 with Athelas 1.5 and 1.6.0, the Italian edition of
 > the game and up to four controllers, and on SteamOS (Proton) with Athelas 1.6.0: about two hours of the campaign with
 > three controllers and the Versus mode with three players. With 1.2.0 the whole campaign was played on SteamOS (Proton)
 > with Athelas 1.7.x, and the Fellowship pages were tested on Windows 11 with Athelas 1.8.0, with controllers, keyboard
@@ -63,7 +63,7 @@ changes nothing on disk except the file it replaces (see *Installation*).
 
 ## Installation
 
-Download `ROTKPlus-1.2.0.zip` from [GitHub Releases](https://github.com/brig-dev/ROTKPlus/releases) or from
+Download `ROTKPlus-1.2.1.zip` from [GitHub Releases](https://github.com/brig-dev/ROTKPlus/releases) or from
 [ModDB](https://www.moddb.com/mods/rotkplus/downloads), then:
 
 1. Close the game. Make a backup copy of the game folder if you wish.
@@ -118,6 +118,10 @@ last letter, *Done* saves and back cancels. A word starts with a capital letter,
 row's name (every controller its own row), Start goes on to the hero selection. The statistics of a level are written
 when the level is left (won, lost, or quit to the map or the menu); a level interrupted by a crash is not counted. A
 player without a name is a guest: shown as "Player N", nothing is saved.
+
+**Mouse.** On the pages the game's pointer selects an entry and a right click goes back. A left click uses the entry
+only when the game turns it into a confirm, and on some setups it does not (then the left click does nothing on the
+pages and on the Fellowship and Versus entries of the main menu): Enter and the controllers always work.
 
 **Portraits.** The pages show the heroes' and the enemies' portraits. ROTKPlus does not ship pictures of the game: it
 makes them on your computer from the game's own HUD portraits, the first time the game shows each of them (so an enemy

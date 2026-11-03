@@ -15,7 +15,7 @@
 #include <stdint.h>
 #include <string>
 
-#define ROTKPLUS_VERSION "1.2.0"
+#define ROTKPLUS_VERSION "1.2.1"
 
 // Call a naked trampoline (one that continues into the game's code) from C++: GameFn((type)&Trampoline)(...).
 // When it sees a static naked function in the same translation unit, MSVC may assume that it does not touch the
