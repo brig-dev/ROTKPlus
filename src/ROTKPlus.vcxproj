@@ -7,14 +7,17 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Audio.cpp" />
     <ClCompile Include="Config.cpp" />
     <ClCompile Include="Coop.cpp" />
     <ClCompile Include="Forward.cpp" />
     <ClCompile Include="HeroIndex.cpp" />
+    <ClCompile Include="Icons.cpp" />
     <ClCompile Include="Hud.cpp" />
     <ClCompile Include="Lang.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Pads.cpp" />
+    <ClCompile Include="Players.cpp" />
     <ClCompile Include="Pvp.cpp" />
     <ClCompile Include="Screens.cpp" />
     <ClCompile Include="Sim.cpp" />

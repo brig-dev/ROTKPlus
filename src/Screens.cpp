@@ -43,6 +43,10 @@
 #include "ROTKPlus.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdarg.h>
+#include <math.h>
+#include <intrin.h>
+#include <string>
 
 static int* const kMode      = (int*)0x562AC0;
 static int* const kPrevMode  = (int*)0x562AC4;
@@ -50,6 +54,8 @@ static int* const kModeExtra = (int*)0x562ABC;
 static int* const kChoice2   = (int*)0x562A88;
 static char* const kOwnProfile2 = (char*)0x562A9C;
 static int* const kCoop      = (int*)0x562A98;
+static float* const kOriginX = (float*)0x8E2F40;   // the drawing origin (Hud.cpp)
+static float* const kOriginY = (float*)0x8E2F44;
 
 enum { MODE_CHARSEL = 1, MODE_SCORING = 2, MODE_UPGRADE = 3, MODE_SCENESEL = 4, MODE_SAVE = 6, MODE_LOADING = 14,
        MODE_COOPSTATS = 16, MODE_MAINMENU = 17 };
@@ -78,7 +84,7 @@ static uint8_t g_menuSlot = kAnySlot;
 static uint8_t* g_csLabel;          // element of player 1's label that was changed, nullptr = not changed
 static uint32_t g_csLabelOld;       // its original text (+0x8C)
 static uint8_t* g_csNumber;         // Player1Number that was changed
-static char     g_csLabelText[64] = "@Player 3";   // of the extra player whose turn it is
+static char     g_csLabelText[128] = "@Player 3";  // of the extra player whose turn it is
 static DWORD    g_csLoadAt;         // next step deferred after an extra player's choice (GetTickCount), 0 = none
 
 void ScreensSetHeroes(int hero3, int hero4)   // from Coop.cpp when the extra players are created (and -1 -1 for levels without)
@@ -128,6 +134,61 @@ static uint8_t* FindElement(const char* name)
     return ((uint8_t*(__cdecl*)(int, const char*))0x4ED940)(0, name);
 }
 
+// --- names of the players in the hero selection (Players.cpp) -------------------------------------------------------
+// The labels CharSelScreen.Player1Label / Player2Label hold the name of a game text ("charSelPlayer1Sel": "Player 1,
+// select your character"). With a name of its own the name is added after the player's number: "Player 1 - Alex,
+// select your character". The original pointer is put back when the selection is left (SetMode) or when an extra player's turn
+// starts, and only if the element is still the one of the current screen.
+struct NameLabel { uint8_t* e; uint32_t old; char text[128]; };
+static NameLabel g_nameLabel[2];
+static const char* const kLabelNames[2] = { "CharSelScreen.Player1Label", "CharSelScreen.Player2Label" };
+
+// "Player <slot+1> - <name>, choose your hero" ("Giocatore 3 - Robin, scegli l'eroe"): the number stays, because it
+// tells which controller's turn it is. The game's own ending ("seleziona il personaggio") made the line too long: with
+// a longer name it went on two lines over the heroes' levels (test of 30/10/2026), so the ending is the mod's shorter
+// text (Players.cpp, "PlayersChoose"). "" if the text does not look like "Player N ..."
+static std::string NamedLabel(int slot, const std::string& base, char digit)
+{
+    const size_t at = base.find(digit);
+    if (at == std::string::npos || at == 0 || at > 24) return "";
+    return "@" + base.substr(0, at) + std::to_string(slot + 1) + " - " + PlayerName(slot) + ", " + PlayersChooseText();
+}
+
+static void RestoreNameLabels()
+{
+    for (int p = 0; p < 2; ++p) {
+        NameLabel& L = g_nameLabel[p];
+        if (L.e && FindElement(kLabelNames[p]) == L.e && *(const char**)(L.e + 0x8C) == L.text)
+            *(uint32_t*)(L.e + 0x8C) = L.old;
+        L.e = nullptr;
+    }
+}
+
+static void NameLabelsFrame()
+{
+    if (*kMode != MODE_CHARSEL) { g_nameLabel[0].e = g_nameLabel[1].e = nullptr; return; }   // already put back by SetMode
+    for (int p = 0; p < 2; ++p) {
+        if (p == 0 && g_csTurn) continue;   // an extra player's turn: the label is theirs
+        if (!PlayerHasName(p)) continue;
+        uint8_t* e = FindElement(kLabelNames[p]);
+        NameLabel& L = g_nameLabel[p];
+        if (!e) continue;
+        const char* cur = *(const char**)(e + 0x8C);
+        if (L.e == e && cur == L.text) continue;            // already ours
+        if (!cur || IsBadStringPtrA(cur, 64)) continue;
+        const std::string base = cur[0] == '@' ? std::string(cur + 1) : LangGameText(cur);
+        if (cur[0] != '@' && base == cur) continue;          // the game's texts are not there yet (it answers the key)
+        const std::string text = NamedLabel(p, base, (char)('1' + p));
+        if (text.empty()) continue;
+        L.e = e;
+        L.old = (uint32_t)(uintptr_t)cur;
+        strncpy_s(L.text, text.c_str(), _TRUNCATE);
+        *(const char**)(e + 0x8C) = L.text;
+        static int logged;
+        if (logged++ < 10) Log("selection: label of player %d -> \"%s\"", p + 1, L.text);
+    }
+}
+
 static void CharSelRestoreScreen()
 {
     if (g_csLabel) { *(uint32_t*)(g_csLabel + 0x8C) = g_csLabelOld; g_csLabel = nullptr; }
@@ -161,6 +222,12 @@ static void CharSelMarkScreen(uint8_t* scene)
                 if (char* d = strrchr(g_csLabelText, '1')) *d = (char)('0' + g_csSlot + 1);
             } else {
                 sprintf_s(g_csLabelText, "@%s", LangText(3, g_csSlot + 1).c_str());
+            }
+            // the extra player's own name, if it has one ("Alex, select your character")
+            if (PlayerHasName(g_csSlot)) {
+                const std::string base = old[0] == '@' ? std::string(old + 1) : LangGameText(old);
+                const std::string named = old[0] != '@' && base == old ? "" : NamedLabel(g_csSlot, base, '1');
+                if (!named.empty()) strncpy_s(g_csLabelText, named.c_str(), _TRUNCATE);
             }
         }
         *(const char**)(e + 0x8C) = g_csLabelText;
@@ -274,6 +341,7 @@ static void CharSelEndTurn(const char* why)
 
 static void CharSelBeginTurn(int slot)
 {
+    RestoreNameLabels();   // player 1's label becomes the extra player's (CharSelMarkScreen)
     g_csTurn = true;
     g_csSlot = slot;
     g_csSaved1 = *(const int*)0x562A84;
@@ -327,10 +395,58 @@ static void CharSelAdvance()
     RawSetMode(MODE_LOADING);
 }
 
+static void NameLabelsFrame();
+
+void AudioFrame();   // Audio.cpp: the streams in the log
+
+// --- log of the mouse clicks (test of 30/10/2026: one click still did two things, and not always through the menu's
+// action handler): every edge of the left button, every action of the menus (ActionFilter) and every SetMode, with the
+// time in ms, the slot, the screen mode and the selected entry, at most ClickLogMax lines ([Diag] ClickLog=1)
+static int g_clickLog;
+static int ClickLogMax;   // 400 with [Diag] ClickLog=1, else 0 (nothing written)
+
+static const char* ElemName(uint32_t e)
+{
+    if (!e) return "-";
+    const char* n = nullptr;
+    __try { n = ((const char*(__cdecl*)(uint32_t))0x4ED810)(e); if (n && IsBadStringPtrA(n, 64)) n = nullptr; }
+    __except (EXCEPTION_EXECUTE_HANDLER) { n = nullptr; }
+    return n ? n : "?";
+}
+
+static DWORD g_leftDownAt;   // the last press of the left button (ClickLogMouse, every frame)
+static DWORD g_screenAt;     // the last change of screen (SetMode, or the screen's root in ScreensFrame)
+
+static void ClickLogMouse()
+{
+    static bool was;
+    const bool down = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
+    if (down && !was) g_leftDownAt = GetTickCount() | 1;
+    if (down == was || g_clickLog >= ClickLogMax) { was = down; return; }
+    was = down;
+    ++g_clickLog;
+    Log("click log: mouse left %s (mode %d, selected %s, page %s)", down ? "down" : "up", *kMode,
+        ElemName(*(const uint32_t*)0x8E2F70), PlayersPageOpen() ? "open" : "closed");
+}
+
 void ScreensFrame()
 {
+    ClickLogMouse();
+    {
+        static uint32_t lastRoot;
+        const uint32_t root = *(const uint32_t*)0x8E2F68;
+        if (root != lastRoot) g_screenAt = GetTickCount() | 1;
+        if (root != lastRoot && g_clickLog < ClickLogMax) {
+            ++g_clickLog;
+            Log("click log: screen %s (mode %d)", ElemName(root), *kMode);
+        }
+        lastRoot = root;
+    }
     UpdateMenuSlot();
+    PlayersFrame();
+    AudioFrame();
     MainMenuFrame();
+    NameLabelsFrame();
     if (!g_csLoadAt || (int)(GetTickCount() - g_csLoadAt) < 0) return;
     g_csLoadAt = 0;
     if (!g_csTurn || *kMode != MODE_CHARSEL) return;
@@ -341,9 +457,24 @@ void ScreensFrame()
 // Versus mode: the level is chosen on the map as usual (the versus mode is meant to work on any level, enemies
 // included, "everybody against everybody"). Skipping the map left the hero selection without its 3D scene and the game
 // crashed, so the level is not forced.
+static void RestoreNameLabels();
+static void MenuDiagLeave(int m);
+
 static void __cdecl SetMode(int m)
 {
+    if (m != *kMode) g_screenAt = GetTickCount() | 1;
+    if (g_clickLog < ClickLogMax && m != *kMode) {
+        ++g_clickLog;
+        Log("click log: SetMode %d -> %d (selected %s)", *kMode, m, ElemName(*(const uint32_t*)0x8E2F70));
+    }
+    MenuDiagLeave(m);
     const int cur = *kMode, prev = *kPrevMode;
+    // statistics of the players (Players.cpp): leaving a level towards the score screen (victory), the map, the hero
+    // selection or the main menu. Other modes (e.g. a movie) do not end the level, nor does a loading: a level loaded
+    // again directly is "Retry", still the same level (PlayersLevelStart).
+    if (cur == 0 && (m == MODE_SCORING || m == MODE_CHARSEL || m == MODE_SCENESEL || m == MODE_MAINMENU))
+        PlayersLevelLeave(m == MODE_SCORING);
+    if (cur == MODE_CHARSEL && m != MODE_CHARSEL) RestoreNameLabels();   // while the selection's elements still exist
     // hero selection
     if (m == MODE_CHARSEL && cur != MODE_CHARSEL) { g_csDone = false; g_csChoice[2] = g_csChoice[3] = -1; g_csScene = nullptr; }
     if (cur == MODE_CHARSEL && m == MODE_LOADING && Coop3Wanted() && *kCoop == 1 && !g_csDone && !g_csTurn) {
@@ -461,7 +592,17 @@ struct MenuItem {
 };
 static MenuItem g_coopItem = { "MainMenuScreen.Coop", nullptr, {}, {}, 0, 3 };
 static MenuItem g_pvpItem  = { "MainMenuScreen.Online", nullptr, {}, {}, 0, 2 };
+// "Players" (names and statistics, Players.cpp): the hidden PlayTrailer entry, made visible like Online
+static MenuItem g_playersItem = { "MainMenuScreen.PlayTrailer", nullptr, {}, {}, 0, 0 };
 static int  g_wantN = 3;        // players of the game in progress (from the confirmed entry)
+
+// a label of the main menu (type 0x82, the menu's font) for the texts of the players' page: the Co-op entry has two,
+// one for the normal entry and one for the highlighted one
+uint8_t* MenuTextTemplate(bool highlighted)
+{
+    if (*kMode != MODE_MAINMENU || !g_coopItem.elem || g_coopItem.n == 0) return nullptr;
+    return g_coopItem.texts[highlighted && g_coopItem.n > 1 ? 1 : 0];
+}
 
 int  CoopPlayers() { return g_cfg.coop ? g_wantN : 2; }
 bool Coop3Wanted() { return CoopPlayers() >= 3; }
@@ -471,6 +612,10 @@ bool PvpAllowed();              // Pvp.cpp
 
 static void ShowChoice(MenuItem& m)
 {
+    if (&m == &g_playersItem) {
+        strncpy_s(m.shown, ("@" + PlayersMenuLabel()).c_str(), _TRUNCATE);
+        return;
+    }
     const std::string label = LangText(&m == &g_coopItem ? 0 : 1);
     const std::string text = "@" + LangText(2, m.players, "", label.c_str());
     strncpy_s(m.shown, text.c_str(), _TRUNCATE);
@@ -569,23 +714,359 @@ static void MoveVersusUnderCoop()
         r > 0 ? *(float*)(row[0] + 0x44) : 0.0f, r > 1 ? *(float*)(row[1] + 0x44) : 0.0f, r > 2 ? *(float*)(row[2] + 0x44) : 0.0f);
 }
 
-// every frame in the main menu: labels of the two entries, Versus entry visible and enabled
+// "Players" right below Versus (or Co-op). Unlike MoveVersusUnderCoop, where the hidden entry already sat in the free
+// place of the list, the place of PlayTrailer is not known: every visible entry BELOW the anchor on the screen moves
+// down by one row (the smallest distance between the anchor and an entry below it) and the item takes the place right
+// below the anchor. The position on the screen counts, not the order in the list: Exit is not after Versus in the list
+// (the first version moved only Options and Credits, and Exit ended up on top of Credits). Group and labels move
+// together, as above. Once per menu opening; in the list the item goes right after the anchor (cursor order).
+static float RowY(uint8_t* e)
+{
+    const uint32_t* sub = *(const uint32_t**)(e + 4);
+    return sub && sub[0] && sub[1] ? *(float*)(uintptr_t)(sub[1] + 0x44) : *(float*)(e + 0x44);
+}
+
+static void ShiftRow(uint8_t* e, float dy)
+{
+    *(float*)(e + 0x44) += dy;
+    const uint32_t* sub = *(const uint32_t**)(e + 4);
+    if (sub)
+        for (uint32_t i = 1; i <= sub[0] && i < 16; ++i)
+            if (uint8_t* c = (uint8_t*)(uintptr_t)sub[i]) *(float*)(c + 0x44) += dy;
+}
+
+static void MoveUnder(uint8_t* anchor, uint8_t* item)
+{
+    uint8_t* root = *(uint8_t**)0x8E2F74;
+    if (!root) root = *(uint8_t**)0x8E2F68;
+    if (!root || !anchor || !item) return;
+    uint32_t* kids = *(uint32_t**)(root + 4);
+    if (!kids) return;
+    const int n = (int)kids[0];
+    int ia = -1, ii = -1;
+    for (int i = 0; i < n && i < 64; ++i) {
+        if (kids[1 + i] == (uint32_t)(uintptr_t)anchor) ia = i;
+        if (kids[1 + i] == (uint32_t)(uintptr_t)item) ii = i;
+    }
+    if (ia < 0 || ii < 0 || ii == ia + 1) return;
+    auto visibleEntry = [](uint8_t* e) { return e && *(const uint16_t*)(e + 0x76) == 10 && *(const uint16_t*)(e + 0x74) != 0; };
+    const float ya = RowY(anchor);
+    uint8_t* rows[16]; int r = 0;
+    float d = 0.0f, above = 0.0f;   // smallest distance below the anchor; above it, as a fallback
+    for (int i = 0; i < n && i < 64; ++i) {
+        uint8_t* e = (uint8_t*)(uintptr_t)kids[1 + i];
+        if (e == item || e == anchor || !visibleEntry(e)) continue;
+        const float y = RowY(e);
+        if (y > ya + 0.001f) {
+            if (r < 16) rows[r++] = e;
+            if (d == 0.0f || y - ya < d) d = y - ya;
+        } else if (y < ya - 0.001f && (above == 0.0f || ya - y < above)) above = ya - y;
+    }
+    if (d == 0.0f) d = above;
+    if (!(d > 0.0f) || d > 200.0f) { Log("main menu: Players entry not moved (row distance %g)", d); return; }
+    // what the menu looks like (to understand a wrong layout from the log)
+    for (int i = 0; i < n && i < 64; ++i)
+        if (uint8_t* e = (uint8_t*)(uintptr_t)kids[1 + i])
+            Log("main menu: child %d type %u visible %u y %g%s", i, *(const uint16_t*)(e + 0x76), *(const uint16_t*)(e + 0x74),
+                RowY(e), e == anchor ? " (anchor)" : e == item ? " (Players)" : "");
+    for (int k = 0; k < r; ++k) ShiftRow(rows[k], d);
+    ShiftRow(item, RowY(anchor) + d - RowY(item));
+    // Exit, the last entry on the screen, was not among the entries found below (second test: it stayed on top of
+    // Credits): looked up by name and moved too, if it was not moved already
+    if (uint8_t* ex = FindElement("MainMenuScreen.Exit")) {
+        bool moved = false;
+        for (int k = 0; k < r; ++k) moved |= rows[k] == ex;
+        if (!moved && ex != anchor && ex != item) {
+            Log("main menu: Exit at y %g (type %u) moved down by %g too", RowY(ex), *(const uint16_t*)(ex + 0x76), d);
+            ShiftRow(ex, d);
+        }
+    }
+    // in the list: right after the anchor
+    const uint32_t moved = kids[1 + ii];
+    if (ii > ia) { for (int i = ii; i > ia + 1; --i) kids[1 + i] = kids[i]; kids[1 + ia + 1] = moved; }
+    else { for (int i = ii; i < ia; ++i) kids[1 + i] = kids[2 + i]; kids[1 + ia] = moved; }
+    Log("main menu: Players entry placed under %s (%d entries moved down by %g)",
+        anchor == g_pvpItem.elem ? "Versus" : "Co-op", r, d);
+}
+
+// while the players' page is open the menu's entries are hidden (and shown again when it closes); also the type 20
+// group (0x4FA040 draws its children), the glowing star that marks the selected entry: it stayed where Fellowship was,
+// over the pages' lists, and could not be moved (test of 03/11/2026)
+static uint8_t* g_hidden[32];
+static uint16_t g_hiddenVis[32];
+static int      g_nHidden;
+
+static void HideMenuEntries()
+{
+    uint8_t* root = *(uint8_t**)0x8E2F74;
+    if (!root) root = *(uint8_t**)0x8E2F68;
+    if (!root) return;
+    const uint32_t* kids = *(const uint32_t**)(root + 4);
+    if (!kids) return;
+    for (uint32_t i = 1; i <= kids[0] && i < 64; ++i) {
+        uint8_t* e = (uint8_t*)(uintptr_t)kids[i];
+        const uint16_t type = e ? *(const uint16_t*)(e + 0x76) : 0;
+        if (type != 10 && type != 20) continue;
+        if (type == 20) {
+            static bool logged;
+            if (!logged) { logged = true; Log("main menu: group %s (type 20) hidden while a page is open", ElemName((uint32_t)(uintptr_t)e)); }
+        }
+        uint16_t* vis = (uint16_t*)(e + 0x74);
+        if (!*vis) continue;
+        int k = 0;
+        while (k < g_nHidden && g_hidden[k] != e) ++k;
+        if (k == g_nHidden) {
+            if (g_nHidden >= 32) continue;
+            g_hidden[g_nHidden] = e; g_hiddenVis[g_nHidden] = *vis; ++g_nHidden;
+        }
+        *vis = 0;
+    }
+}
+
+static void ShowMenuEntries()
+{
+    for (int k = 0; k < g_nHidden; ++k) *(uint16_t*)(g_hidden[k] + 0x74) = g_hiddenVis[k];
+    g_nHidden = 0;
+}
+
+// --- the main menu's demo (diagnostics, [Diag] MenuTimerLog=1) ----------------------------------------------------
+// The main menu starts its demo after about 60 s without activity. Our pages take the menu's actions, so the demo also
+// starts while a page is being used (test of 30/10/2026). What counts the 60 s is not in the C code: moving in the
+// menu runs the entries' scripts (0x4E9890, "rpn!" scripts), and the front end's data has an element called
+// "AttractTim...". Written here: the elements whose name has "attract" in it, with their first 0xC0 bytes and the text
+// at +0x8C (the script, if it is one), the bytes that change every second while the main menu is up, and who leaves
+// the main menu (SetMode) with the callers on the stack. Element names: table at [0x8DCF1C], +4 its size in bytes,
+// entries of 3 dwords from +8 (name, ?, element), "XXXX" ends it (0x4ED6D0, 0x4ED810).
+static bool g_menuDiag;
+static int  g_menuDiagLines;
+struct WatchedElem { uint32_t e; const char* name; uint32_t last[48]; };
+static WatchedElem g_watch[8];
+static int         g_nWatch;
+static uint32_t    g_watchTable;
+
+static bool NameHas(const char* s, const char* low)   // case-insensitive, at most 80 characters of s
+{
+    for (int i = 0; i < 80 && s[i]; ++i) {
+        int k = 0;
+        while (low[k] && s[i + k] && (s[i + k] | 0x20) == low[k]) ++k;
+        if (!low[k]) return true;
+    }
+    return false;
+}
+
+static void Append(char* buf, size_t size, size_t& n, const char* fmt, ...)
+{
+    if (n + 1 >= size) return;
+    va_list ap;
+    va_start(ap, fmt);
+    const int r = _vsnprintf_s(buf + n, size - n, _TRUNCATE, fmt, ap);
+    va_end(ap);
+    n = r < 0 ? size - 1 : n + r;
+}
+
+static void MenuDiagLine(const char* s)
+{
+    if (g_menuDiagLines >= 600) return;
+    if (++g_menuDiagLines == 600) { Log("main menu demo: log limit reached"); return; }
+    Log("main menu demo: %s", s);
+}
+
+// who leaves the main menu (from SetMode): the new mode and the game's return addresses on the stack
+static void MenuDiagLeave(int m)
+{
+    if (!g_menuDiag || *kMode != MODE_MAINMENU || m == MODE_MAINMENU) return;
+    char line[300];
+    size_t n = 0;
+    Append(line, sizeof line, n, "the main menu is left for mode %d (page %s); callers:", m, PlayersPageOpen() ? "open" : "closed");
+    const uint32_t* sp = (const uint32_t*)_AddressOfReturnAddress();
+    for (int i = 0, found = 0; i < 256 && found < 12; ++i) {
+        uint32_t v;
+        __try { v = sp[i]; } __except (EXCEPTION_EXECUTE_HANDLER) { break; }
+        if (v < 0x401005 || v >= 0x535000) continue;
+        const uint8_t* r = (const uint8_t*)(uintptr_t)v;
+        if (r[-5] == 0xE8 || (r[-6] == 0xFF && (r[-5] & 0x38) == 0x10) || (r[-2] == 0xFF && (r[-1] & 0x38) == 0x10)) {
+            Append(line, sizeof line, n, " %08X", v);
+            ++found;
+        }
+    }
+    MenuDiagLine(line);
+}
+
+static void MenuTimerFrame()
+{
+    static DWORD next;
+    const DWORD now = GetTickCount();
+    if ((int)(now - next) < 0) return;
+    next = now + 1000;
+    const uint32_t table = *(const uint32_t*)0x8DCF1C;
+    if (!table) return;
+    char line[900];
+    if (table != g_watchTable) {   // a new front end: look for the elements again
+        g_watchTable = table;
+        g_nWatch = 0;
+        __try {
+            const uint32_t size = *(const uint32_t*)(table + 4);
+            for (uint32_t p = table + 8; p + 12 <= table + size && g_nWatch < 8; p += 12) {
+                const uint32_t name = *(const uint32_t*)p, e = *(const uint32_t*)(p + 8);
+                if (name == 0x58585858 || *(const uint32_t*)(p + 4) == 0x58585858) break;
+                if (!name || !e || !NameHas((const char*)(uintptr_t)name, "attract")) continue;
+                WatchedElem& w = g_watch[g_nWatch++];
+                w.e = e;
+                w.name = (const char*)(uintptr_t)name;
+                memcpy(w.last, (const void*)(uintptr_t)e, sizeof w.last);
+                size_t n = 0;
+                Append(line, sizeof line, n, "element \"%.40s\" at %08X, type %d:", w.name, e,
+                       *(const int16_t*)(uintptr_t)(e + 0x76));
+                for (int i = 0; i < 48; ++i) Append(line, sizeof line, n, " %08X", w.last[i]);
+                MenuDiagLine(line);
+                const char* text = *(const char* const*)(uintptr_t)(e + 0x8C);
+                if (text) {
+                    n = 0;
+                    Append(line, sizeof line, n, "  text at +0x8C: ");
+                    for (int k = 0; k < 400 && text[k] && n + 1 < sizeof line; ++k)
+                        line[n++] = (text[k] >= 32 && text[k] < 127) ? text[k] : '.';
+                    line[n] = 0;
+                    MenuDiagLine(line);
+                }
+            }
+        } __except (EXCEPTION_EXECUTE_HANDLER) {}
+        if (!g_nWatch) MenuDiagLine("no element with \"attract\" in its name");
+    }
+    for (int w = 0; w < g_nWatch; ++w) {
+        uint32_t cur[48];
+        __try { memcpy(cur, (const void*)(uintptr_t)g_watch[w].e, sizeof cur); } __except (EXCEPTION_EXECUTE_HANDLER) { continue; }
+        size_t n = 0;
+        Append(line, sizeof line, n, "\"%.40s\" (page %s):", g_watch[w].name, PlayersPageOpen() ? "open" : "closed");
+        const size_t head = n;
+        for (int i = 0; i < 48; ++i)
+            if (cur[i] != g_watch[w].last[i])
+                Append(line, sizeof line, n, " +%X %08X->%08X (%.2f)", i * 4, g_watch[w].last[i], cur[i],
+                       *(const float*)&cur[i]);
+        memcpy(g_watch[w].last, cur, sizeof cur);
+        if (n > head) MenuDiagLine(line);
+    }
+}
+
+// The main menu's demo. The front end's element "AttractTimer" counts at +0x80, about 1200 a second (20 a frame at 60
+// fps), up to +0x84 (72000: its 60.0 seconds at +0x78); then its script leaves the main menu for the demo (SetMode(14)
+// from 0x480D69). Moving in the menu puts the counter back to 0 (test of 30/10/2026, [Diag] MenuTimerLog=1). Our pages
+// take the menu's actions, so every action or key they use does the same.
+void MenuIdleReset()
+{
+    __try {
+        uint8_t* e = FindElement("AttractTimer");
+        if (!e) return;
+        const float secs = *(const float*)(e + 0x78);
+        if (secs > 1.0f && secs < 1000.0f && *(const uint32_t*)(e + 0x84) != 0) *(uint32_t*)(e + 0x80) = 0;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {}
+}
+
+// The pointer over an entry of the main menu selects it. Test of 30/10/2026: with the Fellowship entry the pointer no
+// longer moved the selection (the keys did). The game's own way is a command of the menu's scripts (0x4FF040, called
+// through the table at 0x570100): the first child of the screen (*0x8E2F68) under the pointer, by 0x4FE9F0(element, x,
+// y, 0) for each, becomes the selection (0x8E2F70) if it is an entry (type 10). Doing the same test here found the
+// entry two places below the pointer (the pointer on Single lit Options), with the screen at 0, 0: the test's positions
+// are not where the entries are drawn. So the entries' places are taken where they are really drawn: every label
+// (type 0x82) of an entry, when the dispatcher draws it (ScreensSawElement, from Hud.cpp), is at the drawing origin
+// (0x8E2F40/44) plus its own x / y, as 0x4FB800 computes them; the pointer, in the same absolute fractions as our
+// pages' texts, is compared with those rows.
+struct EntryPos { uint32_t entry; float x, y; };
+static EntryPos g_entryPos[24];
+static int      g_nEntryPos;
+static uint32_t g_entryRoot;   // the screen the entries belong to: a new front end has new elements (old pointers die)
+
+static float ElemX(uint32_t e) { return ((float(__cdecl*)(uint32_t))0x4F9FE0)(e); }   // x / y as fractions
+static float ElemY(uint32_t e) { return ((float(__cdecl*)(uint32_t))0x4FA010)(e); }
+
+void ScreensSawElement(uint32_t e)
+{
+    if (!e || *kMode != MODE_MAINMENU || PlayersPageOpen()) return;
+    const uint32_t root = *(const uint32_t*)0x8E2F68;
+    if (root != g_entryRoot) { g_entryRoot = root; g_nEntryPos = 0; }   // noted again at the next frame
+    __try {
+        if (*(const uint16_t*)(uintptr_t)(e + 0x76) != 0x82 || !*(const uint16_t*)(uintptr_t)(e + 0x74)) return;
+        const uint32_t parent = *(const uint32_t*)(uintptr_t)e;   // +0: the parent (as 0x4FDEE0 reads it)
+        if (!parent || *(const uint16_t*)(uintptr_t)(parent + 0x76) != 10) return;
+        const float x = *kOriginX + ElemX(e), y = *kOriginY + ElemY(e);
+        int i = 0;
+        while (i < g_nEntryPos && g_entryPos[i].entry != parent) ++i;
+        if (i == g_nEntryPos) {
+            if (g_nEntryPos >= (int)(sizeof g_entryPos / sizeof g_entryPos[0])) return;
+            ++g_nEntryPos;
+        }
+        g_entryPos[i] = EntryPos{ parent, x, y };
+    } __except (EXCEPTION_EXECUTE_HANDLER) {}
+}
+
+static void MenuHover()
+{
+    static float lastX = -1.0f, lastY = -1.0f;
+    static uint32_t lastOver = 1;
+    static int logged;
+    if (!*(const uint8_t*)0x8E38BC || !*(const uint32_t*)0x8E38C4) return;
+    if (*(const uint32_t*)0x8E2F68 != g_entryRoot) return;   // the entries noted belong to another front end
+    float x = 0.0f, y = 0.0f;
+    __try { ((void(__cdecl*)(float*, float*))0x501800)(&x, &y); } __except (EXCEPTION_EXECUTE_HANDLER) { return; }
+    if (fabsf(x - lastX) < 0.002f && fabsf(y - lastY) < 0.002f) return;
+    lastX = x; lastY = y;
+    uint32_t over = 0;
+    float overY = 0.0f;
+    __try {
+        // the visible entry whose row (from its label's top to a little below it) holds the pointer
+        for (int i = 0; i < g_nEntryPos; ++i) {
+            const EntryPos& p = g_entryPos[i];
+            if (!*(const uint16_t*)(uintptr_t)(p.entry + 0x74)) continue;
+            if (y >= p.y - 0.01f && y < p.y + 0.06f && x >= p.x - 0.30f && x < p.x + 0.50f) { over = p.entry; overY = p.y; break; }
+        }
+        if (over && *(const uint32_t*)0x8E2F70 != over) *(uint32_t*)0x8E2F70 = over;
+    } __except (EXCEPTION_EXECUTE_HANDLER) { return; }
+    if (over != lastOver && logged < 12) {
+        ++logged;
+        const char* name = over ? ((const char*(__cdecl*)(uint32_t))0x4ED810)(over) : nullptr;
+        Log("main menu: pointer at %.3f %.3f over entry %s (row at %.3f, %d entries known)", x, y,
+            name && !IsBadStringPtrA(name, 64) ? name : over ? "?" : "none", overY, g_nEntryPos);
+    }
+    lastOver = over;
+}
+
+// every frame in the main menu: labels of the entries, Versus and Players entries visible and enabled
 static void MainMenuFrame()
 {
-    if (!g_cfg.coop || *kMode != MODE_MAINMENU) { RestoreItem(g_coopItem); RestoreItem(g_pvpItem); return; }
+    if (g_menuDiag && *kMode == MODE_MAINMENU) MenuTimerFrame();
+    if (!g_cfg.coop || *kMode != MODE_MAINMENU) {
+        ShowMenuEntries();
+        RestoreItem(g_coopItem); RestoreItem(g_pvpItem); RestoreItem(g_playersItem);
+        return;
+    }
     if (HookItem(g_coopItem))
         for (int i = 0; i < g_coopItem.n; ++i) *(const char**)(g_coopItem.texts[i] + 0x8C) = g_coopItem.shown;
-    if (!PvpAllowed()) return;
-    uint8_t* before = g_pvpItem.elem;
-    if (HookItem(g_pvpItem)) {
-        *(uint16_t*)(g_pvpItem.elem + 0x74) = 1;
-        for (int i = 0; i < g_pvpItem.n; ++i) {
-            *(uint16_t*)(g_pvpItem.texts[i] + 0x74) = 1;
-            *(const char**)(g_pvpItem.texts[i] + 0x8C) = g_pvpItem.shown;
+    if (PlayersPageOpen()) { HideMenuEntries(); return; }
+    ShowMenuEntries();
+    if (PvpAllowed()) {
+        uint8_t* before = g_pvpItem.elem;
+        if (HookItem(g_pvpItem)) {
+            *(uint16_t*)(g_pvpItem.elem + 0x74) = 1;
+            for (int i = 0; i < g_pvpItem.n; ++i) {
+                *(uint16_t*)(g_pvpItem.texts[i] + 0x74) = 1;
+                *(const char**)(g_pvpItem.texts[i] + 0x8C) = g_pvpItem.shown;
+            }
+            if (g_pvpItem.elem != before) ((void(__cdecl*)(uint8_t*))0x4FC3A0)(g_pvpItem.elem);   // enabled
+            MoveVersusUnderCoop();
         }
-        if (g_pvpItem.elem != before) ((void(__cdecl*)(uint8_t*))0x4FC3A0)(g_pvpItem.elem);   // enabled
-        MoveVersusUnderCoop();
     }
+    if (PlayersEnabled()) {
+        uint8_t* before = g_playersItem.elem;
+        if (HookItem(g_playersItem)) {
+            *(uint16_t*)(g_playersItem.elem + 0x74) = 1;
+            for (int i = 0; i < g_playersItem.n; ++i) {
+                *(uint16_t*)(g_playersItem.texts[i] + 0x74) = 1;
+                *(const char**)(g_playersItem.texts[i] + 0x8C) = g_playersItem.shown;
+            }
+            if (g_playersItem.elem != before) ((void(__cdecl*)(uint8_t*))0x4FC3A0)(g_playersItem.elem);   // enabled
+            MoveUnder(PvpAllowed() && g_pvpItem.elem ? g_pvpItem.elem : g_coopItem.elem, g_playersItem.elem);
+        }
+    }
+    MenuHover();
 }
 
 static __declspec(naked) void MenuActionOrig()   // mov al,[8E2111h]
@@ -597,10 +1078,67 @@ static __declspec(naked) void MenuActionOrig()   // mov al,[8E2111h]
     }
 }
 
+// "Who is playing?" (Players.cpp): the confirmation of Single, Co-op or Versus is held back while the page is open and
+// run afterwards as the game would have: the same selected element (0x8E2F70) and the same controller's slot
+// ([0x8E2111], which 0x4EA0F0 copies to 0x56DC74 for the entry's script)
+static uint32_t g_pendSel;
+static uint8_t  g_pendSlot;
+static int      g_pendKind;     // 0 none, 1 Single, 2 Co-op, 3 Versus
+
+static void ConfirmPending()
+{
+    const int kind = g_pendKind;
+    g_pendKind = 0;
+    if (!kind || *kMode != MODE_MAINMENU) return;
+    ShowMenuEntries();   // as they were before the page
+    uint32_t sel = g_pendSel;
+    if (kind >= 2) {
+        MenuItem& m = kind == 3 ? g_pvpItem : g_coopItem;
+        g_wantN = m.players;
+        PvpSetActive(kind == 3);
+        Log("main menu: confirmed %s with %d players", kind == 3 ? "Versus" : "Co-op", g_wantN);
+        if (kind == 3 && g_coopItem.elem) sel = (uint32_t)(uintptr_t)g_coopItem.elem;   // the co-op script
+    } else Log("main menu: confirmed Single");
+    *(uint32_t*)0x8E2F70 = sel;
+    uint8_t* const actSlot = (uint8_t*)0x8E2111;
+    const uint8_t was = *actSlot;
+    *actSlot = g_pendSlot;
+    GameFn((void(__cdecl*)(int))&MenuActionOrig)(7);
+    *actSlot = was;
+}
+
 // replaces 0x4EA0F0(action): the menus' default action handler
 static void __cdecl MenuAction(int action)
 {
     const uint32_t sel = *(const uint32_t*)0x8E2F70;
+    const uint8_t slot = *(const uint8_t*)0x8E2111;   // the controller's slot of this action
+    // the players' page takes the actions while it is open; confirming the Players entry opens it
+    if (*kMode == MODE_MAINMENU &&
+        PlayersMenuAction(action, sel && g_playersItem.elem && sel == (uint32_t)(uintptr_t)g_playersItem.elem, slot)) {
+        // a key or button of the page (up, down, left, right, confirm, back): the menu is in use, no demo
+        if (action == 0 || action == 2 || action == 4 || action == 5 || action == 7 || action == 8) MenuIdleReset();
+        if (PlayersLineupDone()) ConfirmPending();
+        return;
+    }
+    if (*kMode == MODE_MAINMENU && sel && action == 7 && PlayersAskWhoPlays()) {
+        uint8_t* single = FindElement("MainMenuScreen.Single");
+        const bool isSingle = single && sel == (uint32_t)(uintptr_t)single;
+        MenuItem* m = sel == (uint32_t)(uintptr_t)g_coopItem.elem ? &g_coopItem
+                    : sel == (uint32_t)(uintptr_t)g_pvpItem.elem ? &g_pvpItem : nullptr;
+        // only an enabled entry (+0x20 == 0, see 0x4FC3A0): a disabled one goes to the game as usual
+        if ((isSingle || m) && *(const uint32_t*)(uintptr_t)(sel + 0x20) == 0) {
+            const int n = isSingle ? 1 : m->players;
+            if (m) g_wantN = n;   // early: the fourth player's controller is looked for only with 4 players
+            if (PlayersOpenLineup(n)) {
+                g_pendSel = sel;
+                g_pendSlot = slot;
+                g_pendKind = isSingle ? 1 : m == &g_coopItem ? 2 : 3;
+                Log("main menu: %s chosen (slot %u), who is playing? first", isSingle ? "Single" : m == &g_coopItem ?
+                    "Co-op" : "Versus", slot);
+                return;
+            }
+        }
+    }
     if (*kMode == MODE_MAINMENU && sel) {
         MenuItem* m = sel == (uint32_t)(uintptr_t)g_coopItem.elem ? &g_coopItem
                     : sel == (uint32_t)(uintptr_t)g_pvpItem.elem ? &g_pvpItem : nullptr;
@@ -624,6 +1162,81 @@ static void __cdecl MenuAction(int action)
     GameFn((void(__cdecl*)(int))&MenuActionOrig)(action);
 }
 
+// One mouse click brings two confirms: the pointer's (slot 3) and, about 15 ms later, one from slot 0 (the mouse button
+// bound as a key). Where the first changes screen, the second lands on the new one: Back in Options or Credits returned
+// to the main menu and the second confirm chose Single, the entry selected there (test of 30/10/2026; ROTK Fix removes
+// the game's 50 ms pause on screen changes, which may have hidden it). Filtering it in our handler of the main menu
+// (MenuAction) was not enough: Options and Credits have handlers of their own, and the first confirm went there. The
+// menu loop (0x4EAA60) calls whatever handler [0x56DC70] holds, and only 0x4EA1D0 changes it (returning the previous
+// one): that pointer now always holds ActionFilter, and 0x4EA1D0 (hooked) changes the handler ActionFilter calls. A
+// confirm within 250 ms of one from another slot, either of them from slot 3, is dropped, in every screen.
+static uintptr_t g_handler = 0x4EA0F0;   // the screen's own handler
+
+static void __cdecl ActionFilter(int action)
+{
+    if (g_clickLog < ClickLogMax && (action == 7 || action == 8)) {
+        ++g_clickLog;
+        Log("click log: action %d slot %u (mode %d, selected %s, handler %08X, page %s)", action,
+            *(const uint8_t*)0x8E2111, *kMode, ElemName(*(const uint32_t*)0x8E2F70), (unsigned)g_handler,
+            PlayersPageOpen() ? "open" : "closed");
+    }
+    // The left mouse button is also a key of player 1 (quick attack, "PSM" in Options), and in the menus it confirms
+    // the entry selected by the keys: a click on Options opened Options through the pointer and, at the same time,
+    // confirmed Single, the entry the keys had selected (a tester's reading of the test of 30/10/2026, and the log). Out of
+    // our pages the pointer does the click by itself, so a confirm from slot 0 while the left button is down, or was
+    // pressed a moment ago, with neither Enter nor Space held, is dropped. (On our pages the click is taken from it.)
+    if (action == 7 && *(const uint8_t*)0x8E2111 == 0 && !PlayersPageOpen() &&
+        ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) || (g_leftDownAt && GetTickCount() - g_leftDownAt < 300)) &&
+        !(GetAsyncKeyState(VK_RETURN) & 0x8000) && !(GetAsyncKeyState(VK_SPACE) & 0x8000)) {
+        static int logged;
+        if (logged++ < 8) Log("menu: confirm of the left mouse button as a key dropped (mode %d)", *kMode);
+        return;
+    }
+    // A confirm right after a change of screen belongs to the screen that was left: the game waited 50 ms after every
+    // change, ROTK Fix removes that pause, and the key or button that closed a screen confirmed the entry selected in
+    // the next one (log of 30/10/2026: back from Credits, a confirm from slot 0 2 ms later chose Single). Only the
+    // confirms, for 150 ms.
+    if (action == 7 && g_screenAt && GetTickCount() - g_screenAt < 150) {
+        static int logged;
+        if (logged++ < 8) Log("menu: confirm right after a change of screen dropped (mode %d)", *kMode);
+        return;
+    }
+    if (action == 7) {
+        static DWORD lastAt;
+        static uint8_t lastSlot;
+        const uint8_t slot = *(const uint8_t*)0x8E2111;
+        const DWORD now = GetTickCount();
+        if (lastAt && now - lastAt < 250 && slot != lastSlot && (slot == 3 || lastSlot == 3)) {
+            static int logged;
+            if (logged++ < 8) Log("menu: second confirm of one click dropped (slots %u and %u, mode %d)", lastSlot, slot, *kMode);
+            lastAt = 0;
+            return;
+        }
+        lastAt = now | 1;
+        lastSlot = slot;
+    }
+    ((void(__cdecl*)(int))g_handler)(action);
+}
+
+// replaces 0x4EA1D0(handler): 0 = the default one (0x4EA0F0); returns the previous one
+static uintptr_t __cdecl SetActionHandler(uintptr_t h)
+{
+    const uintptr_t prev = g_handler;
+    g_handler = h ? h : 0x4EA0F0;
+    return prev;
+}
+
+static bool InstallActionFilter()
+{
+    static const uint8_t setOld[] = { 0x8B, 0x4C, 0x24, 0x04, 0x85, 0xC9, 0xA1, 0x70, 0xDC, 0x56, 0x00 };
+    uintptr_t& cur = *(uintptr_t*)0x56DC70;
+    const uintptr_t was = cur;
+    if (!PatchJmp(0x4EA1D0, setOld, sizeof setOld, (const void*)&SetActionHandler)) return false;
+    g_handler = was ? was : 0x4EA0F0;
+    cur = (uintptr_t)&ActionFilter;
+    return true;
+}
+
 bool ScreensInstall()
 {
     {
@@ -633,6 +1246,9 @@ bool ScreensInstall()
         g_wantN = g_coopItem.players;
         Log("main menu: Co-op with %d players, Versus with %d (left/right on the entry)", g_coopItem.players,
             g_pvpItem.players);
+        g_menuDiag = IniInt("Diag", "MenuTimerLog", 0) != 0;
+        ClickLogMax = IniInt("Diag", "ClickLog", 0) != 0 ? 400 : 0;
+        if (g_menuDiag) Log("main menu demo diagnostics: active ([Diag] MenuTimerLog=1)");
     }
     static const uint8_t actionOld[] = { 0xA0, 0x11, 0x21, 0x8E, 0x00 };
     bool okMenu = PatchJmp(0x4EA0F0, actionOld, sizeof actionOld, (const void*)&MenuAction);
@@ -647,6 +1263,7 @@ bool ScreensInstall()
     ok &= PatchJmp(0x4F4110, contOld, sizeof contOld, (const void*)&UpgradeContinue);
     static const uint8_t menuOld[] = { 0x3A, 0x1D, 0x75, 0xDC, 0x56, 0x00, 0x88, 0x1D, 0x11, 0x21, 0x8E, 0x00 };
     ok &= PatchJmp(0x4EAAA0, menuOld, sizeof menuOld, (const void*)&MenuSlotStub);
+    if (!InstallActionFilter()) Log("menu: filter of the second confirm of a click NOT installed");
     Log("extra players' turns in the end-of-level screens: %s", ok ? "active" : "NOT installed");
     return ok;
 }

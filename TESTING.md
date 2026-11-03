@@ -55,6 +55,11 @@ installed correctly on your setup and the interesting part of your report is how
 7. **Versus mode** with 2, 3 and 4 players: do hits, combos, specials, arrows, the spear and blocking work between players?
    Does the last player standing win, with a banner, and does the level close?
 8. **Save and load.** Save, quit, load the same slot: do players 3 and 4 keep their progress?
+9. **Fellowship entry** (1.2 and later): give names with the keyboard and with a controller, play a level, look at
+   Comparison (all six tabs), a player's profile, Records and Last game. Are the texts readable in your language and at
+   your screen size, do kills, assists and deaths look right for each player? Does the mouse work on the pages?
+10. **Who is playing?** (1.2 and later): after Single, Co-op or Versus, does the page show one row per player with the
+    last line-up? Can each controller change its own row, and does Start lead to the hero selection with those names?
 
 ## Things we especially want to know
 
@@ -62,7 +67,8 @@ installed correctly on your setup and the interesting part of your report is how
 - Controllers other than Xbox / PlayStation / Steam Controller; two identical controllers; a controller unplugged while playing.
 - The Steam Deck, and four players on Linux (three players on SteamOS with Proton have been tested).
 - Levels other than the first ones: levels with computer allies, long levels, the last levels, levels with cutscenes.
-- Athelas versions newer than 1.6.0.
+- Athelas versions newer than 1.8.0.
+- Wide screens (21:9 and wider): the Fellowship pages were only seen at 16:9.
 
 ## How to report
 

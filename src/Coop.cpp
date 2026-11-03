@@ -215,6 +215,15 @@ static int __cdecl LoadPackages(PackageList* list)
         }
     }
     g_livesExtra = (g_hero[2] >= 0) + (g_hero[3] >= 0);
+    if (chars >= 1 && list->count >= 1) {   // statistics of the players (Players.cpp): a game level, not the menu
+        // the level is the last package: "Data/Game/Min/Min02.scw" -> "min02"
+        char code[64];
+        const char* name = strrchr(list->path[list->count - 1], '/');
+        strcpy_s(code, name ? name + 1 : list->path[list->count - 1]);
+        if (char* dot = strchr(code, '.')) *dot = 0;
+        _strlwr_s(code);
+        PlayersLevelStart(code);
+    }
     return ((int(__cdecl*)(PackageList*))kLoadPackages)(list);
 }
 
@@ -414,9 +423,11 @@ static const uintptr_t kFramePair  = 0x46F530;   // registers: edx = point A, ec
 
 static void RecallStragglers();
 
+static bool g_camera = true;   // [Coop] Camera: 0 = the game's own framing of players 1 and 2 (to compare, e.g. the music)
+
 static void __cdecl AdjustCameraFocus()
 {
-    if (!g_players[2]) return;
+    if (!g_players[2] || !g_camera) return;
     RecallStragglers();
     float* a = (float*)0x5A5BA0;
     float* b = (float*)0x5A5B90;
@@ -704,7 +715,10 @@ bool CoopInstall()
     ok &= PatchJmp(0x488C60, unfrzOld, sizeof unfrzOld, (const void*)&FreezeAll);
     // victory: level completed for the extra players' heroes too
     ok &= PatchCall(0x480C6B, 0x47F590, (const void*)&CreditExtraStub);
-    // co-op camera that frames the extra players
+    // co-op camera that frames the extra players (and brings back whoever is stuck outside the frame); [Coop] Camera=0
+    // leaves the game's own framing of players 1 and 2
+    g_camera = IniInt("Coop", "Camera", 1) != 0;
+    if (!g_camera) Log("co-op: camera frames only players 1 and 2 ([Coop] Camera=0)");
     ok &= PatchCall(0x46FBBA, kFramePair, (const void*)&FramePairStub);
     // bring back whoever is stuck outside the camera frame
     ok &= PatchCall(0x441454, kViewEdge, (const void*)&ViewEdge);
@@ -715,6 +729,7 @@ bool CoopInstall()
     if (g_cfg.hud) ok &= HudInstall(g_cfg.hudDx, g_cfg.hudDy, g_cfg.hudRow, g_cfg.hudScale);
     ok &= HeroInstall();
     ok &= ScreensInstall();
+    PlayersInstall();   // names and statistics: reported on a line of its own
     Log("co-op with 3 or 4 players: %s (players at %p, models at %p, third player's controls from slot %d)",
         ok ? "installed" : "installed IN PART, see errors above", g_players, g_models, g_cfg.input3);
     return ok;

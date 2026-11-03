@@ -56,7 +56,11 @@ specification: if you find an error, please open an issue.
 
 - Damage is applied by `0x40CF80(character, damage, attacker)` (for players it goes through the difficulty table
   `0x578F48` and updates the HUD); events are sent with `0x401780(victim, event, data, result, attacker)`; event
-  `0x259` is "hit" with `{attacker, kind, damage, ...}`.
+  `0x259` is "hit" with `{attacker, kind, damage, ...}`. The hit handlers call it at `0x4031BC` (in `0x403040`),
+  `0x404D12` and `0x404D5B` (in `0x404CB0`, enemies) and at `0x43A1A9` (players, attacker from the event's first field);
+  it returns whether the life (`+0x90`) is at or below zero. After a kill `0x403040` credits it to a player: the attacker
+  itself if it is a player (`+0x7A` = 99, index `+0x690`), otherwise the owner of the attacking object (`0x4019E0`, ECX =
+  object: arrows, spears).
 - Melee: `0x40EF50(attacker, centre, radius)` -> `0x47D180` -> collision system (sweep and prune: `0x4795F0`,
   `0x479CA0`; volumes at `0x5BB9E4`, stride `0xE0`: `+0` shape, `+1`, `+2` type (1 body, 5 hittable), `+3` state, `+4`
   check function, `+0x10` owner). The side filter is `0x40EDC0`. The hit shapes `0x415070`, `0x4152C0`, `0x4154F0` keep
@@ -84,7 +88,21 @@ specification: if you find an error, please open an issue.
 - Screens: mode `0x562AC0`, previous mode `0x562AC4`, changed by `0x47FA20(mode)`. Modes: 0 game, 1 hero selection,
   2 score, 3 shop, 4 map, 6 save, 14 loading, 16 co-op statistics, 17 main menu. The selection scene object holds each
   hero's state at `+0x124 + hero*4` (computed by `0x456210`; 4 = taken, 5 available). Menu actions go through the loop
-  `0x4EAA60` and the handler `0x4EA0F0`; `0x4EA200(slot)` writes the slot *excluded* from the menus (`0x56DC75`).
+  `0x4EAA60` and the handler `0x4EA0F0` (via `[0x56DC70]`; 0 up, 2 down, 4 right, 5 left, 7 confirm, 8 back);
+  `0x4EA200(slot)` writes the slot *excluded* from the menus (`0x56DC75`).
+- Every frame `0x4F6690` draws the screens' roots `*0x8E2F68` and then `*0x8E2F74` through `0x4FD590`. The main menu's
+  entries (`MainMenuScreen.Single`, `.Coop`, `.Online`, `.PlayTrailer`, `.Exit`...) are type-10 groups among the children
+  of `*0x8E2F74`, each with two labels (type `0x82`, normal and highlighted); `Online` and `PlayTrailer` are hidden by
+  `0x4EEF10` and are enabled with `0x4FC3A0`.
+- Text: a text element is drawn by `0x4E94D0`, which puts the text manager (`*0x56D628`) in its immediate mode
+  (`[+0x124]` = 1, `0x4DF070`); `0x4DF5E0` then sets up the font (`0x49BF50`), draws the text (`0x49C4D0`, called at
+  `0x4DF65A`) and cleans up (`0x49C040`). `0x49C4D0` draws the shadow first (flag `0x10000` at `+0x9C`, by calling
+  itself), then calls `0x49CC50` at `0x49C853` for **every letter**: a lock of the 2D vertex buffer for 4 vertices
+  (`0x4A2BA0(3, 4)`, format 3 = FVF `0x142`, 24 bytes: x, y, z, colour, u, v), the corners (snapped to the screen's
+  pixels when the mode `0x562AC0` is not 8; red and blue swapped; u, v times the font's `+0x444` / `+0x448`), the unlock
+  (`0x4A2CF0`, which returns the first vertex) and a `DrawPrimitive` fan of two triangles. Under DXVK the lock is the
+  slow part (a page of some 600 letters took a frame from 16 to 20-25 ms); ROTKPlus gathers the letters of a text and
+  draws them with one lock and one triangle list, still inside `0x4DF5E0` (`Hud.cpp`, `[General] FastText`).
 
 ## Camera
 

@@ -16,6 +16,7 @@
 // instead, is dressed as player 2). Its box sits at the top left, above player 1's (same HudX/HudY offset as the
 // third player's). Extra slots: 2 = third, 3 = fourth.
 #include "ROTKPlus.h"
+#include <math.h>
 #include <string.h>
 #include <stdio.h>
 
@@ -242,6 +243,16 @@ static uint8_t* TextSource()
 }
 void HudNewLevel() { g_textRoot = nullptr; g_textSrc = nullptr; }
 
+// a copy of that text element (0xB0 bytes) for Players.cpp's level summary on the score screen, where the HUD is gone:
+// it holds no pointers the drawing follows (font index, colours, scale, box), so the copy stays good after the level
+bool HudTextTemplate(uint8_t* out)
+{
+    uint8_t* src = TextSource();
+    if (!src || IsBadReadPtr(src, 0xB0)) return false;
+    memcpy(out, src, 0xB0);
+    return true;
+}
+
 // Respawn countdown "Respawn in N" of the extra players. For players 1 and 2 it is written by 0x4ED110 (character in
 // ESI) into the screen elements "respawna" and "respawnb", which are not part of the players' blocks: calling it for
 // the extra players showed the text in player 2's place and made their boxes disappear. Here it is drawn by hand,
@@ -407,17 +418,93 @@ static void DrawExtraMark(uint8_t* src, int slot)
     uv[1] = kMarkCut;
     GameFn(&DrawElementOrig)((uint32_t)(uintptr_t)g_mark);
     uv[1] = v0;
-    // caption
+    // caption: the player's name (Players.cpp), or "g3"/"g4"
     uint8_t* text = TextSource();
     if (!text) return;
     memcpy(g_caption, text, 0xB0);
     *(uint32_t*)(g_caption + 4) = 0;
     *(uint16_t*)(g_caption + 0x74) = 1;
     *(float*)(g_caption + 0x88) = 0.0f;
-    *(const char**)(g_caption + 0x8C) = four ? "@g4" : "@g3";
+    static char named[2][48];
+    const bool hasName = PlayersHeadNames() && PlayerHasName(slot);
+    if (hasName) {
+        _snprintf_s(named[slot - 2], sizeof named[0], _TRUNCATE, "@%s", PlayerName(slot).c_str());
+        *(float*)(g_caption + 0x68) = (*(float*)(text + 0x68) ? *(float*)(text + 0x68) : 1.0f) * PlayersNameScale();
+        *(float*)(g_caption + 0x6C) = (*(float*)(text + 0x6C) ? *(float*)(text + 0x6C) : 1.0f) * PlayersNameScale();
+    }
+    *(const char**)(g_caption + 0x8C) = hasName ? named[slot - 2] : four ? "@g4" : "@g3";
     *(float*)(g_caption + 0x40) = left;
     *(float*)(g_caption + 0x44) = top;
     GameFn(&DrawElementOrig)((uint32_t)(uintptr_t)g_caption);
+}
+
+// --- names of players 1 and 2 above their heads, and of everybody next to the HUD boxes (Players.cpp) -------------
+// Players 1 and 2: the game draws their marks "1p"/"2p" (coopmark1p/coopmark2p, 0x8E2904/0x8E2908) at a position it
+// computes every frame (+0x40/+0x44 of the element, left/top): the name takes the place of the letters (DrawMark).
+// The HUD boxes: the name just above each box, at the height of the boxes' texts (the respawn countdown is at 0.835,
+// x 0.165 for player 1's box and 0.675 for player 2's; the extra players' boxes are moved by HudX/HudY). Not in the
+// reduced row (HudRow=1), where the boxes are small and close together.
+static uint8_t g_nameText[0x200];
+
+static void DrawNameAt(const std::string& name, float x, float y, bool originZero)
+{
+    uint8_t* src = TextSource();
+    if (!src) return;
+    static char buf[48];
+    _snprintf_s(buf, sizeof buf, _TRUNCATE, "@%s", name.c_str());
+    memcpy(g_nameText, src, 0xB0);
+    *(uint32_t*)(g_nameText + 4) = 0;
+    *(uint16_t*)(g_nameText + 0x74) = 1;
+    *(float*)(g_nameText + 0x88) = 0.0f;
+    *(const char**)(g_nameText + 0x8C) = buf;
+    *(float*)(g_nameText + 0x40) = x;
+    *(float*)(g_nameText + 0x44) = y;
+    *(float*)(g_nameText + 0x68) = (*(float*)(src + 0x68) ? *(float*)(src + 0x68) : 1.0f) * PlayersNameScale();
+    *(float*)(g_nameText + 0x6C) = (*(float*)(src + 0x6C) ? *(float*)(src + 0x6C) : 1.0f) * PlayersNameScale();
+    if (!originZero) { GameFn(&DrawElementOrig)((uint32_t)(uintptr_t)g_nameText); return; }
+    const float ox = *kOriginX, oy = *kOriginY;
+    *kOriginX = 0.0f; *kOriginY = 0.0f;
+    GameFn(&DrawElementOrig)((uint32_t)(uintptr_t)g_nameText);
+    *kOriginX = ox; *kOriginY = oy;
+}
+
+// The marks of players 1 and 2 (0x8E2904 / 0x8E2908): the "g1"/"g2" letters are the upper part of the mark's own image.
+// With a name, the mark is drawn like the extra players' ones: only the arrow (lower part of the image), and the name
+// above it in place of the letters (test of 30/10/2026: "g1 Alex" side by side was too much; the name alone is better).
+static uint8_t g_markP[0x200];
+
+static void DrawMark(uint32_t e)
+{
+    if (!e) { GameFn(&DrawElementOrig)(e); return; }
+    const int slot = e == *(const uint32_t*)0x8E2904 ? 0 : e == *(const uint32_t*)0x8E2908 ? 1 : -1;
+    uint8_t* src = (uint8_t*)(uintptr_t)e;
+    uint8_t* text = slot >= 0 ? TextSource() : nullptr;
+    if (!text || !PlayersHeadNames() || !PlayerHasName(slot) || *(const int*)0x562A98 != 1 || !*(const uint16_t*)(src + 0x74)) {
+        GameFn(&DrawElementOrig)(e);
+        return;
+    }
+    const float left = *(const float*)(src + 0x40), top = *(const float*)(src + 0x44);
+    const float hgt = ((float(__cdecl*)(uint8_t*))0x4F9FB0)(src);
+    memcpy(g_markP, src, 0xA0);
+    *(uint32_t*)(g_markP + 4) = 0;
+    *(float*)(g_markP + 0x44) = top + hgt * kMarkCut;
+    *(float*)(g_markP + 0x24) *= 1.0f - kMarkCut;
+    float* uv = (float*)0x56DC10;
+    const float v0 = uv[1];
+    uv[1] = kMarkCut;
+    GameFn(&DrawElementOrig)((uint32_t)(uintptr_t)g_markP);
+    uv[1] = v0;
+    DrawNameAt(PlayerName(slot), left, top, false);
+}
+
+static void DrawHudNames()
+{
+    if (!PlayersHudNames() || g_row || *(const int*)0x562A98 != 1) return;
+    const float y = 0.79f;
+    if (g_players[0] && PlayerHasName(0)) DrawNameAt(PlayerName(0), 0.165f, y, true);
+    if (g_players[1] && PlayerHasName(1)) DrawNameAt(PlayerName(1), 0.675f, y, true);
+    if (g_players[2] && PlayerHasName(2)) DrawNameAt(PlayerName(2), 0.675f + g_hudDx, y + g_hudDy, true);
+    if (g_players[3] && PlayerHasName(3)) DrawNameAt(PlayerName(3), 0.165f + g_hudDx, y + g_hudDy, true);
 }
 
 // --- big text in the middle of the screen (winner of the versus mode, Pvp.cpp) --------------------------------------
@@ -455,10 +542,10 @@ static void DrawBanner()
     *kOriginX = ox; *kOriginY = oy;
 }
 
-static void __cdecl DrawElement(uint32_t e)
+static void DrawElementHud(uint32_t e)
 {
     if (e && e == *(const uint32_t*)0x8E2908 && g_players[2] && !g_extraHudDepth) {
-        GameFn(&DrawElementOrig)(e);   // draws nothing if player 2 is out of view (+0x74 = 0); the extra players do, if in view
+        DrawMark(e);   // draws nothing if player 2 is out of view (+0x74 = 0); the extra players do, if in view
         DrawExtraMark((uint8_t*)(uintptr_t)e, 2);
         if (g_players[3] && *(const uint32_t*)0x8E2904) DrawExtraMark((uint8_t*)(uintptr_t)*(const uint32_t*)0x8E2904, 3);   // arrow of "1p" (orange)
         return;
@@ -466,15 +553,144 @@ static void __cdecl DrawElement(uint32_t e)
     const bool row = g_row && g_players[2] && !g_drawingExtra && !g_extraHudDepth && e &&
                      (e == *(const uint32_t*)kHudA || e == *(const uint32_t*)kHudB);
     if (row) DrawBlockScaled((uint8_t*)(uintptr_t)e, e == *(const uint32_t*)kHudA ? 0.0f : 1.0f / (float)ActivePlayers(), &DrawPlain);
-    else GameFn(&DrawElementOrig)(e);
+    else DrawMark(e);   // any element; the marks of players 1 and 2 with their names
     if (!e || g_drawingExtra || e != *(const uint32_t*)kHudB) return;
-    if (!g_extraHudDepth) DrawBanner();
+    if (!g_extraHudDepth) { DrawBanner(); DrawHudNames(); }
     if (!g_players[2] || !g_players[1] || g_extraHudDepth) return;   // also with the extra players dead or waiting
     g_drawingExtra = true;
     DrawExtraHud(e, 2);
     DrawExtraCountdown(2);
     if (g_players[3] && *(const uint32_t*)kHudA) { DrawExtraHud(*(const uint32_t*)kHudA, 3); DrawExtraCountdown(3); }
     g_drawingExtra = false;
+}
+
+// replaces 0x4FD590: the HUD of the extra players (if installed), then the players' page (Players.cpp), which goes on
+// top of the main menu's last root (0x4F6690 draws *0x8E2F68 and then *0x8E2F74)
+static bool g_hudOn;
+void ScreensSawElement(uint32_t e);   // Screens.cpp: where the main menu's entries are drawn
+
+static void __cdecl DrawElement(uint32_t e)
+{
+    ScreensSawElement(e);
+    if (g_hudOn) DrawElementHud(e);
+    else if (e) DrawMark(e);
+    else GameFn(&DrawElementOrig)(e);
+    PlayersAfterDraw(e);
+}
+
+bool DrawHookInstall()
+{
+    static int state;   // 0 not yet, 1 installed, -1 failed
+    if (!state) {
+        static const uint8_t drawOld[] = { 0x56, 0x8B, 0x74, 0x24, 0x08 };
+        state = PatchJmp(kDrawElement, drawOld, sizeof drawOld, (const void*)&DrawElement) ? 1 : -1;
+    }
+    return state == 1;
+}
+
+static int g_ownText;   // DrawGameElement is drawing: the texts are the mod's (FastText 1)
+
+// one element drawn on its own (texts of the players' page), with the drawing origin at the top left of the screen
+void DrawGameElement(uint8_t* e)
+{
+    const float ox = *kOriginX, oy = *kOriginY;
+    *kOriginX = 0.0f; *kOriginY = 0.0f;
+    ++g_ownText;
+    GameFn(&DrawElementOrig)((uint32_t)(uintptr_t)e);
+    --g_ownText;
+    *kOriginX = ox; *kOriginY = oy;
+}
+
+// --- texts drawn in one go ---------------------------------------------------------------------------------------
+// The game draws a text one letter at a time: 0x49C4D0 calls 0x49CC50 for each letter (and for each letter of the
+// shadow, if the text has one), which locks the 2D vertex buffer for four vertices (0x4A2BA0, format 3: x, y, z, colour,
+// u, v, 24 bytes), writes them, unlocks it (0x4A2CF0) and draws a fan of two triangles. Under DXVK, with ROTK Fix keeping
+// a copy of every lock of the 2D buffers, the lock is the slow part: a page of ours (some 600 letters) took the menu
+// from 60 to 40-55 fps, with ROTK Fix 1.7.8 as with 1.8.0 (logs of 02-03/11/2026, the stalls in the lock at 0x4A2C7F).
+// Here the letters of a text are written into a list, as 0x49CC50 computes them, and drawn with one lock and one list
+// of triangles when the text is done: still inside 0x4DF5E0, after the font's set-up (0x49BF50) and before its
+// clean-up (0x49C040), so with the same texture and states, and through the same device calls ROTK Fix watches.
+// [General] FastText: 1 = the mod's own texts (the default), 2 = every text the game draws this way, 0 = off.
+static int  g_fastText;
+static bool g_batching;
+struct GlyphVtx { float x, y, z; uint32_t c; float u, v; };
+static const int kMaxGlyphs = 512;   // a text has at most 191 letters, twice with its shadow
+static GlyphVtx g_glyphVtx[kMaxGlyphs * 6];
+static int g_glyphs;
+static DWORD g_fastT0;
+static unsigned g_fastTexts, g_fastLetters;
+
+static void FlushGlyphs()
+{
+    if (!g_glyphs) return;
+    const int n = g_glyphs * 6;
+    g_fastLetters += g_glyphs;
+    ++g_fastTexts;
+    g_glyphs = 0;
+    __try {
+        // the game's own lock and unlock: they pick the buffer, its offset and the stream source
+        void* p = ((void*(__cdecl*)(int, int))0x4A2BA0)(3, n);
+        if (p) memcpy(p, g_glyphVtx, n * sizeof(GlyphVtx));
+        const unsigned start = ((unsigned(__cdecl*)())0x4A2CF0)() & 0xFFFF;   // (0x49CDC3: movzx eax, ax)
+        void* dev = *(void* const*)0x5C2364;
+        typedef long(__stdcall* DrawPrim)(void*, int, unsigned, unsigned);
+        if (p && dev) ((DrawPrim)(*(void***)dev)[70])(dev, 4 /* triangle list */, start, n / 3);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {}
+    if (LogDetail()) {
+        const DWORD now = GetTickCount();
+        if (!g_fastT0) g_fastT0 = now;
+        else if (now - g_fastT0 >= 60000) {
+            Log("texts: %u drawn in one go in %u s (%u letters)", g_fastTexts, (now - g_fastT0) / 1000, g_fastLetters);
+            g_fastT0 = now; g_fastTexts = g_fastLetters = 0;
+        }
+    }
+}
+
+// in place of 0x49CC50(font, glyph record, x, y, x offset, y offset, x scale, y scale, colour), called at 0x49C853
+static void __cdecl Glyph(uint8_t* font, const float* g, float x, float y, float dx, float dy, float sx, float sy, uint32_t colour)
+{
+    if (!g_batching) {
+        ((void(__cdecl*)(uint8_t*, const float*, float, float, float, float, float, float, uint32_t))0x49CC50)(font, g, x, y, dx, dy, sx, sy, colour);
+        return;
+    }
+    if (g_glyphs == kMaxGlyphs) FlushGlyphs();
+    const uint32_t c = ((colour >> 16) & 0xFF) | ((colour & 0xFF) << 16) | (colour & 0xFF00FF00);   // red and blue swapped
+    x += dx;
+    y += dy;
+    if (*(const int*)0x562AC0 != 8) {   // on the screen's pixels
+        const double w = *(const uint16_t*)0x569C24, h = *(const uint16_t*)0x569C28;
+        x = (float)(nearbyint(w * x) / w);
+        y = (float)(nearbyint(y * h) / h);
+    }
+    const float x1 = x + sx * g[0], y1 = y + sy * g[1];
+    const float fu = *(const float*)(font + 0x444), fv = *(const float*)(font + 0x448);
+    const float u0 = g[2] * fu, u1 = g[3] * fu, v0 = g[4] * fv, v1 = g[5] * fv;
+    // the fan's corners 0 1 2 3 (top left, top right, bottom right, bottom left) as the triangles 0 1 2 and 0 2 3
+    const GlyphVtx a = { x, y, 0.0f, c, u0, v0 }, b = { x1, y, 0.0f, c, u1, v0 };
+    const GlyphVtx d = { x1, y1, 0.0f, c, u1, v1 }, e = { x, y1, 0.0f, c, u0, v1 };
+    GlyphVtx* v = g_glyphVtx + g_glyphs++ * 6;
+    v[0] = a; v[1] = b; v[2] = d; v[3] = a; v[4] = d; v[5] = e;
+}
+
+// in place of 0x49C4D0(font, text state, text), called at 0x4DF65A (the text manager's immediate draw)
+static void __cdecl TextRun(uint8_t* font, uint8_t* state, const char* text)
+{
+    typedef void(__cdecl* Run)(uint8_t*, uint8_t*, const char*);
+    if (g_batching || !(g_fastText == 2 || (g_fastText == 1 && g_ownText))) { ((Run)0x49C4D0)(font, state, text); return; }
+    g_batching = true;
+    ((Run)0x49C4D0)(font, state, text);
+    g_batching = false;
+    FlushGlyphs();
+}
+
+void FastTextInstall(int mode)
+{
+    if (mode <= 0) { Log("texts: drawn a letter at a time, as the game does ([General] FastText=0)"); return; }
+    g_fastText = mode >= 2 ? 2 : 1;
+    const bool ok = PatchCall(0x49C853, 0x49CC50, (const void*)&Glyph) && PatchCall(0x4DF65A, 0x49C4D0, (const void*)&TextRun);
+    if (!ok) g_fastText = 0;
+    Log("texts: %s", !ok ? "NOT drawn in one go (the game's code is not the expected one)" :
+        g_fastText == 2 ? "every text drawn in one go ([General] FastText=2)" : "the mod's texts drawn in one go");
 }
 
 bool HudInstall(float dx, float dy, bool row, float rowScale)
@@ -484,8 +700,9 @@ bool HudInstall(float dx, float dy, bool row, float rowScale)
     ok &= PatchCall(0x40CF50, kHudUpdate, (const void*)&HudUpdate);   // jmp of the thunk
     ok &= PatchCall(0x40D091, kHudUpdate, (const void*)&HudUpdate);
     ok &= PatchCall(0x40D0A0, kHudUpdate, (const void*)&HudUpdate);
-    static const uint8_t drawOld[] = { 0x56, 0x8B, 0x74, 0x24, 0x08 };
-    ok &= PatchJmp(kDrawElement, drawOld, sizeof drawOld, (const void*)&DrawElement);
+    const bool draw = DrawHookInstall();
+    ok &= draw;
+    g_hudOn = draw;   // as before: the extra players' boxes are drawn whenever the drawing hook is in place
     static const uint8_t levelOld[] = { 0x55, 0x8B, 0xEC, 0x83, 0xE4, 0xF0, 0x83, 0xEC, 0x18 };
     static const uint8_t flashOld[] = { 0x6A, 0x01, 0xE8 };
     ok &= PatchJmp(0x4ED4D0, levelOld, sizeof levelOld, (const void*)&LevelUp);

@@ -14,13 +14,12 @@ changes nothing on disk except the file it replaces (see *Installation*).
 **Download:** [GitHub Releases](https://github.com/brig-dev/ROTKPlus/releases) or
 [ModDB](https://www.moddb.com/mods/rotkplus/downloads) (same file). Mod page: <https://www.moddb.com/mods/rotkplus>. What changed: [CHANGELOG.md](CHANGELOG.md)
 
-> **Status:** version 1.1.0. ROTKPlus 1.0.0 was tested on Windows 11 with Athelas 1.5 and 1.6.0, the Italian edition of
+> **Status:** version 1.2.0. ROTKPlus 1.0.0 was tested on Windows 11 with Athelas 1.5 and 1.6.0, the Italian edition of
 > the game and up to four controllers, and on SteamOS (Proton) with Athelas 1.6.0: about two hours of the campaign with
-> three controllers and the Versus mode with three players. The changes of 1.1.0 (session logs, a statistics fix) were
-> tested on Windows 11 with Athelas 1.6.0 and keyboard-simulated players (see *Testing without controllers*). Not tested
-> on the Steam Deck. English is the default
-> language of the mod's own texts; Italian was verified in the game; French, German and Spanish are untested
-> translations (see *Language*).
+> three controllers and the Versus mode with three players. With 1.2.0 the whole campaign was played on SteamOS (Proton)
+> with Athelas 1.7.x, and the Fellowship pages were tested on Windows 11 with Athelas 1.8.0, with controllers, keyboard
+> and mouse. Not tested on the Steam Deck. English is the default language of the mod's own texts; Italian was verified
+> in the game; French, German and Spanish are untested translations (see *Language*).
 
 ## Features
 
@@ -40,19 +39,31 @@ changes nothing on disk except the file it replaces (see *Installation*).
   on any level (with the level's enemies, everybody against everybody).
 - Progress of the extra players (levels, experience, purchases) shows up in the save game under the first player's
   profile: in the tests, players 1, 3 and 4 saw it when they loaded the same save slot.
+- **Fellowship** entry in the main menu (from 1.2; "Compagnia" in Italian): a name for each player, typed with the
+  keyboard or with letters on the screen for controllers, and **statistics per name**, added up over all your sessions:
+  levels played, won and completed, time, kills (of which at range, with spears, killing moves and in single-player
+  games), assists (you hit an enemy, a teammate finishes it within 15 seconds), deaths, kills by rating, experience,
+  favourite hero; kills by kind of enemy (with soldiers, shields, archers and captains apart) and of every boss, combos
+  by name, parries, ladders pushed down, enemies set on fire, things picked up; in Versus games,
+  wins, opponents knocked down and own falls; and the same per hero. A **Comparison** of four players in six tabs, a
+  **profile** of each player, **records**, the **last game**, and **name management** (add, rename, merge two names,
+  delete). **Who is playing?** before every game gives each place its name. The names also appear above the players'
+  heads and in the hero selection ("Player 1 - Alex, select your character") and in the Versus winner banner. The third
+  and fourth player's controllers remember their player's name. Kept in `ROTKPlus_players.ini` in the game folder, with
+  a dated copy in `ROTKPlus_logs` whenever it changes.
 
 ## Requirements
 
 - The game, in the version that Athelas calls "Game v1.0" (`rotk.exe` of 1,703,936 bytes). Other
   executables are detected and ROTKPlus does nothing.
 - [Athelas](https://github.com/Shagg88/Athelas) with ROTK Fix set up for the game (it provides `SDL3.dll`, the
-  controller layer and the graphics fix). Tested with Athelas 1.5 and 1.6.0.
+  controller layer and the graphics fix). Tested with Athelas 1.5 to 1.8.0.
 - One controller per player (Xbox-style, PlayStation, anything SDL3 supports). Without a controller an extra player
   stands still (or, with `KeyboardFallback=1`, moves with player 1's keys).
 
 ## Installation
 
-Download `ROTKPlus-1.1.0.zip` from [GitHub Releases](https://github.com/brig-dev/ROTKPlus/releases) or from
+Download `ROTKPlus-1.2.0.zip` from [GitHub Releases](https://github.com/brig-dev/ROTKPlus/releases) or from
 [ModDB](https://www.moddb.com/mods/rotkplus/downloads), then:
 
 1. Close the game. Make a backup copy of the game folder if you wish.
@@ -73,11 +84,13 @@ To remove it, delete ROTKPlus's `DivxMediaLib.dll` and rename `DivxMediaLib_orig
 Each start of the game creates `ROTKPlus_logs\ROTKPlus_<date>_<time>.log` and keeps the older ones, so after a long
 session you can still find the log of last night. `ROTKPlus.log` next to `rotk.exe` is a copy of the latest session. The
 log starts with the setup (ROTKPlus version, Windows or Wine/Proton, sizes of the ROTK Fix files), then records every
-patch, the menu choices, the heroes, deaths and falls, and, with `[Log] Detail=1` (the default), a snapshot of the players
-every minute and the game's statistics at the start and end of each level (a few lines a minute, nothing heavy). A line
+patch, the menu choices, the heroes, deaths and falls. With `[Log] Detail=1` (off by default since 1.2.0) it also keeps
+a detailed trace of every level: a snapshot of the players every minute, the game's statistics at the start and end of
+each level, every kill, hit and pick-up; turn it on when you report a problem with the statistics. A line
 `session end` closes the file when the game exits normally. `[Log] Keep=N` in `ROTKPlus.ini` keeps only the N newest
-files (default 0: nothing is ever deleted; a session of an hour is usually well under 100 KB). `ROTKFix.log` is written by ROTK Fix and is
-overwritten at every start: copy it yourself if you need it.
+files (default 0: nothing is ever deleted; a session of an hour is usually well under 100 KB). `ROTKFix.log` is written
+by ROTK Fix and is overwritten at every start; when the game closes, ROTKPlus puts a copy of it next to the session's
+log, with the same date and time (`[Log] CopyRotkFixLog=0` turns this off).
 
 `tools/check_log.py` (Python 3) summarises a log in a few seconds and can remove your user name from it before you post
 it; [TESTING.md](TESTING.md) explains how to download and run it.
@@ -87,6 +100,32 @@ it; [TESTING.md](TESTING.md) explains how to download and run it.
 In the main menu choose **Co-op: 3 players** (or 4), or **Versus: 3 players**, and confirm. Players 1 and 2 choose
 as usual; then the third and fourth players choose their heroes, one after the other, with their own controllers. In a
 level the extra players join right away. Use the same save slot for players 1 and 2 to see everybody's progress.
+
+**Fellowship** (main menu): up/down choose an entry; on the right a preview shows what it holds. On one of the four
+places, left/right (or the arrows) pick one of the names used before, Guest (no statistics) or *New name...*; confirm
+opens that player's profile, or the editor for a new name. In the editor a keyboard types directly (Enter saves,
+Escape cancels, Backspace deletes); with a controller move on the letters and confirm each one, *Delete* removes the
+last letter, *Done* saves and back cancels. A word starts with a capital letter, the rest are lower case.
+
+- **Comparison**: four players side by side in six tabs. Left/right change the tab, the shoulder buttons (or Page Up /
+  Page Down) the players, up/down scroll the Enemies tab, confirm opens the profile of the selected player.
+- **Player profiles**: one player's main numbers, heroes, enemies, bosses and levels completed; left/right another
+  player, confirm the table of their heroes.
+- **Records**, **Last game**, and **Manage names** (add a name, or choose one and rename it, merge it into another one,
+  or delete it with its statistics; deleting and merging ask for confirmation).
+
+**Who is playing?** comes after Single, Co-op or Versus: one row per player with the last line-up, left/right change a
+row's name (every controller its own row), Start goes on to the hero selection. The statistics of a level are written
+when the level is left (won, lost, or quit to the map or the menu); a level interrupted by a crash is not counted. A
+player without a name is a guest: shown as "Player N", nothing is saved.
+
+**Portraits.** The pages show the heroes' and the enemies' portraits. ROTKPlus does not ship pictures of the game: it
+makes them on your computer from the game's own HUD portraits, the first time the game shows each of them (so an enemy
+gets its portrait once you have met it), and keeps them in `ROTKPlus_icons` in the game folder. The game has no portrait
+for Shelob, Gorbag and the mumakil, so their rows show the name only. To add a picture of your own, put a file
+`FoeShelob.raw`, `FoeGorbag.raw` or `FoeMumakil.raw` in `ROTKPlus_icons`: the 4 bytes `RPI1`, the width and the height
+(32-bit numbers, little-endian), then the pixels row by row from the top, 4 bytes each in the order blue, green, red,
+alpha (128 x 128 looks like the others). An icon that is already there is never replaced.
 
 Key `F9` (only if `[Diag] VictoryKey=1`) ends the level with a victory: useful to see the end-of-level screens.
 
@@ -102,8 +141,8 @@ Athelas with no controller connected. The keys work only while the game window h
 | 3 | I J K L | U | O | P | Y | H |
 | 4 | numpad 8 4 5 6 (Num Lock on) | Num 0 | Num . | Num 1 | Num 2 | Num 3 |
 
-In the menus (hero selection, score, statistics, shop), during the turn of player 3 or 4 the keys of player 1 also work for
-them: W A S D to move, Enter or Space to confirm, Escape or Backspace to go back.
+In the menus (hero selection, score, statistics, shop) the keys of player 1 also work for whoever's turn it is, players 2,
+3 and 4 included: W A S D to move, Enter or Space to confirm, Escape or Backspace to go back.
 One person can drive one character at a time, which is enough to look at the creation of the players, the HUD, deaths and
 respawns, the hero selection and the end-of-level screens. It is a testing aid, not a way to play.
 
@@ -119,15 +158,25 @@ respawns, the hero selection and the end-of-level screens. It is a testing aid, 
 | | `Pad`, `PadName` | use controllers for the extra players; pick the third one by part of its name |
 | | `Hud`, `HudX`, `HudY`, `HudRow`, `HudScale` | position and size of the extra HUD boxes |
 | `[PvP]` | `Enabled`, `Players`, `Lives` | the Versus entry, its number of players, lives per player |
+| `[Players]` | `Enabled`, `TextScale`, `TableScale`, `Shade` | the Fellowship entry (names and statistics); size of its texts; the dark rectangle behind them (0 none, 1 black) |
+| | `AskWhoPlays` | "Who is playing?" before every game (1, default) or the names of the Fellowship page (0) |
+| | `HeadNames`, `HudNames`, `NameScale` | names above the heads in place of g1-g4 (on by default) and above the HUD boxes (off) |
+| | `ScoreSummary`, `SummaryScale`, `SummaryY` | the level summary on the score screen (off by default) |
+| | `CaptureIcons` | make the portraits from the game's own (1, default) |
 | `[General]` | `Language` | `auto`, `en`, `it`, `fr`, `de`, `es` or your own code |
+| | `FastText` | the mod's texts drawn in one go (1, default), also the game's own (2, untested), never (0) |
+| `[Log]` | `Detail`, `Keep` | detailed level trace (0, default); how many session logs to keep (0 = all) |
+| | `StatsBackups`, `CopyRotkFixLog` | dated copies of the statistics to keep (10); a copy of `ROTKFix.log` (1) |
 
 ## Language
 
-The mod writes a few texts (the two menu entries, "Player N" in the selection screen, the winner banner). Everything
-else is the game's own text. With `Language=auto` the language is recognised from the game's own text for "Player 1".
-Built-in: English, Italian (verified), French, German, Spanish (unverified, no accents because the game's menu font
-may not have them). To fix or add a language without recompiling, put a `ROTKPlus.lang.ini` next to `rotk.exe`; see
-`config/ROTKPlus.lang.ini.example`. Contributions of translations are welcome.
+The mod writes its own texts: the menu entries, "Player N" in the selection screen, the winner banner, and the Fellowship
+pages (about 150 texts). Level names are the game's own. With `Language=auto` the language is recognised from
+the game's own text for "Player 1". Built-in: English, Italian (verified), French, German, Spanish (unverified, no
+accents because the game's menu font may not have them). To fix or add a language without recompiling, put a
+`ROTKPlus.lang.ini` next to `rotk.exe`; see `config/ROTKPlus.lang.ini.example`. Any text can be replaced there by its
+key: the keys of the menu texts are in the example, those of the Fellowship pages are the first column of the table
+`kTxt` at the top of `src/Players.cpp`. Contributions of translations are welcome.
 
 ## Building
 

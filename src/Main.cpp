@@ -11,6 +11,7 @@
 static char             g_dir[MAX_PATH];
 static CRITICAL_SECTION g_logCs;
 static FILE*            g_log;        // this session's own file: ROTKPlus_logs\ROTKPlus_<date>_<time>.log
+static char             g_logStamp[40];   // its <date>_<time>[_n], for the copy of ROTK Fix's log at the end
 static FILE*            g_logLatest;  // ROTKPlus.log: a copy of the latest session, always in the same place
 static bool             g_detail = true;
 static DWORD            g_startTick;
@@ -48,17 +49,20 @@ static void OpenLogs()
                   t.wHour, t.wMinute, t.wSecond, suffix);
         if (GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES) continue;   // restarted within the same second
         fopen_s(&g_log, path, "w");
+        if (g_log) sprintf_s(g_logStamp, "%04d-%02d-%02d_%02d-%02d-%02d%s", t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute,
+                             t.wSecond, suffix);
     }
     sprintf_s(path, "%s\\ROTKPlus.log", g_dir);
     fopen_s(&g_logLatest, path, "w");
 }
 
-// [Log] Keep=N: keeps only the N newest session files (0, the default, never deletes anything).
-static void DeleteOldLogs(int keep)
+// [Log] Keep=N: keeps only the N newest session files (0, the default, never deletes anything), and as many copies of
+// ROTK Fix's log (see the end of the session below).
+static void DeleteOldLogs(int keep, const char* prefix)
 {
     if (keep <= 0) return;
     char pattern[MAX_PATH];
-    sprintf_s(pattern, "%s\\ROTKPlus_logs\\ROTKPlus_*.log", g_dir);
+    sprintf_s(pattern, "%s\\ROTKPlus_logs\\%s_*.log", g_dir, prefix);
     std::vector<std::string> names;
     WIN32_FIND_DATAA fd;
     HANDLE h = FindFirstFileA(pattern, &fd);
@@ -70,6 +74,64 @@ static void DeleteOldLogs(int keep)
         char p[MAX_PATH]; sprintf_s(p, "%s\\ROTKPlus_logs\\%s", g_dir, names[i].c_str());
         DeleteFileA(p);
     }
+}
+
+// A copy of the statistics at every start (03/11/2026: the whole campaign was in one file on SteamOS), in
+// ROTKPlus_logs as ROTKPlus_players_<date>_<time>.ini, so that copying the logs also saves them. Only when the file
+// changed since the newest copy (starting the game ten times without playing must not push the real ones out); the
+// newest [Log] StatsBackups (10, 0 = none) are kept.
+static bool SameFile(const char* a, const char* b)
+{
+    FILE* fa = nullptr; FILE* fb = nullptr;
+    if (fopen_s(&fa, a, "rb") || !fa) return false;
+    if (fopen_s(&fb, b, "rb") || !fb) { fclose(fa); return false; }
+    bool same = true;
+    char ba[4096], bb[4096];
+    for (;;) {
+        const size_t na = fread(ba, 1, sizeof ba, fa), nb = fread(bb, 1, sizeof bb, fb);
+        if (na != nb || memcmp(ba, bb, na)) { same = false; break; }
+        if (!na) break;
+    }
+    fclose(fa); fclose(fb);
+    return same;
+}
+
+static void BackupStats(int keep)
+{
+    if (keep <= 0) return;
+    char src[MAX_PATH], pattern[MAX_PATH];
+    sprintf_s(src, "%s\\ROTKPlus_players.ini", g_dir);
+    if (GetFileAttributesA(src) == INVALID_FILE_ATTRIBUTES) { Log("statistics: no ROTKPlus_players.ini yet, nothing to copy"); return; }
+    sprintf_s(pattern, "%s\\ROTKPlus_logs\\ROTKPlus_players_*.ini", g_dir);
+    std::vector<std::string> names;
+    WIN32_FIND_DATAA fd;
+    HANDLE h = FindFirstFileA(pattern, &fd);
+    if (h != INVALID_HANDLE_VALUE) { do names.push_back(fd.cFileName); while (FindNextFileA(h, &fd)); FindClose(h); }
+    std::sort(names.begin(), names.end());   // the names start with the date: oldest first
+    char p[MAX_PATH];
+    if (!names.empty()) {
+        sprintf_s(p, "%s\\ROTKPlus_logs\\%s", g_dir, names.back().c_str());
+        if (SameFile(src, p)) { Log("statistics: unchanged since the copy %s", names.back().c_str()); return; }
+    }
+    char stamp[40];
+    if (g_logStamp[0]) strcpy_s(stamp, g_logStamp);
+    else {
+        SYSTEMTIME t; GetLocalTime(&t);
+        sprintf_s(stamp, "%04d-%02d-%02d_%02d-%02d-%02d", t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond);
+    }
+    char dir[MAX_PATH];
+    sprintf_s(dir, "%s\\ROTKPlus_logs", g_dir);
+    CreateDirectoryA(dir, nullptr);
+    sprintf_s(p, "%s\\ROTKPlus_players_%s.ini", dir, stamp);
+    if (!CopyFileA(src, p, FALSE)) { Log("statistics: copy to %s failed (error %lu)", p, GetLastError()); return; }
+    names.push_back(std::string("ROTKPlus_players_") + stamp + ".ini");
+    int removed = 0;
+    for (size_t i = 0; i + keep < names.size(); ++i) {
+        sprintf_s(p, "%s\\%s", dir, names[i].c_str());
+        if (DeleteFileA(p)) ++removed;
+    }
+    Log("statistics: copied to ROTKPlus_logs\\ROTKPlus_players_%s.ini (%d older copies removed, the newest %d kept)", stamp,
+        removed, keep);
 }
 
 // The first lines of every session: the setup, so that a report does not need to ask for it.
@@ -178,14 +240,19 @@ static LONG CALLBACK CrashLogger(EXCEPTION_POINTERS* ep)
                        (LPCSTR)(uintptr_t)c->Eip, &at);
     const bool inGame = c->Eip >= 0x401000 && c->Eip < 0x535000;
     if (!inGame && at != self) return EXCEPTION_CONTINUE_SEARCH;
-    if (!inGame) Log("CRASH inside ROTKPlus, at +%X from the start of the DLL", (unsigned)(c->Eip - (uintptr_t)self));
+    // A vectored handler runs before the __try blocks: an access violation that ROTKPlus itself expects and handles
+    // (reading a character or a stream that may be gone) also arrives here. So only the first three are written, the
+    // line about ROTKPlus included (it used to be written every time, before the count).
     static LONG once;
     if (InterlockedIncrement(&once) > 3) return EXCEPTION_CONTINUE_SEARCH;
+    if (!inGame) Log("CRASH inside ROTKPlus, at +%X from the start of the DLL (it may be one ROTKPlus handles itself)",
+                     (unsigned)(c->Eip - (uintptr_t)self));
     Log("CRASH at %08X (%s %08X)", c->Eip, er->ExceptionInformation[0] ? "write" : "read",
         (unsigned)er->ExceptionInformation[1]);
     Log("    eax=%08X ebx=%08X ecx=%08X edx=%08X esi=%08X edi=%08X ebp=%08X esp=%08X",
         c->Eax, c->Ebx, c->Ecx, c->Edx, c->Esi, c->Edi, c->Ebp, c->Esp);
     char line[512]; int n = 0;
+    line[0] = 0;   // no caller found: an empty list, not uninitialised bytes
     const uint32_t* sp = (const uint32_t*)c->Esp;
     for (int i = 0, found = 0; i < 512 && found < 16; ++i) {
         uint32_t v;
@@ -203,26 +270,35 @@ static LONG CALLBACK CrashLogger(EXCEPTION_POINTERS* ep)
 
 void PvpInstall();                // Pvp.cpp
 void SupportInstall(bool victoryKey);   // Support.cpp
+void AudioInstall(bool on);       // Audio.cpp
+void AudioBanksInstall(bool on);  // Audio.cpp
 
 static void Start()
 {
     g_startTick = GetTickCount();
-    g_detail = IniInt("Log", "Detail", 1) != 0;
+    g_detail = IniInt("Log", "Detail", 0) != 0;   // (1 until 1.2.0: the level traces are for reports, not for everybody)
     OpenLogs();
-    DeleteOldLogs(IniInt("Log", "Keep", 0));
+    DeleteOldLogs(IniInt("Log", "Keep", 0), "ROTKPlus");
+    DeleteOldLogs(IniInt("Log", "Keep", 0), "ROTKFix");
     Log("ROTKPlus %s", ROTKPLUS_VERSION);
     Log("game folder: %s", g_dir);
     LogSessionHeader();
     Log("log: detail %d, keep %d session files (0 = all)", g_detail, IniInt("Log", "Keep", 0));
+    BackupStats(IniInt("Log", "StatsBackups", 10));
     if ((uintptr_t)GetModuleHandleA(NULL) != 0x400000 || !GameIsSupported()) {
         Log("rotk.exe not recognised (version 1.0, 1,703,936 bytes, is required): nothing was changed");
         return;
     }
     AddVectoredExceptionHandler(1, CrashLogger);
     LoadConfig();
+    FastTextInstall(IniInt("General", "FastText", 1));
     SupportInstall(IniInt("Diag", "VictoryKey", 0) != 0);
+    AudioInstall(IniInt("Diag", "AudioLog", 0) != 0);
     SimInstall(IniInt("Debug", "SimPads", 0) != 0);
-    if (g_cfg.coop) CoopInstall();
+    if (g_cfg.coop) {
+        AudioBanksInstall(IniInt("Coop", "SoundBanks", 1) != 0);
+        CoopInstall();
+    }
     else Log("co-op with 3 or 4 players is off ([Coop] Enabled=0)");
     PvpInstall();
 }
@@ -239,6 +315,14 @@ BOOL APIENTRY DllMain(HMODULE mod, DWORD reason, LPVOID)
         __try {
             const DWORD s = (GetTickCount() - g_startTick) / 1000;
             Log("session end after %lu min %lu s", s / 60, s % 60);
+            // ROTK Fix rewrites its log at every start: a copy next to this session's own, with the same date and time,
+            // so that the two can be read together later ([Log] CopyRotkFixLog=0 turns it off)
+            if (g_logStamp[0] && IniInt("Log", "CopyRotkFixLog", 1)) {
+                char from[MAX_PATH], to[MAX_PATH];
+                sprintf_s(from, "%s\\ROTKFix.log", g_dir);
+                sprintf_s(to, "%s\\ROTKPlus_logs\\ROTKFix_%s.log", g_dir, g_logStamp);
+                Log("log: copy of ROTKFix.log: %s", CopyFileA(from, to, TRUE) ? to : "not made");
+            }
         } __except (EXCEPTION_EXECUTE_HANDLER) {}
     }
     return TRUE;

@@ -46,6 +46,7 @@ static uint32_t __cdecl ScriptCall(int type, int x, uint32_t code, float* args, 
 {
     const uint32_t r = GameFn((uint32_t(__cdecl*)(int, int, uint32_t, float*, float*, int, int))&ScriptCallOrig)(
         type, x, code, args, res, a6, a7);
+    PlayersScriptCall(type, code, args);
     ScreensFrame();
     return r;
 }
@@ -188,7 +189,7 @@ void SupportFrame()   // from Pads.cpp, every frame, on the game's thread
     }
     if (!g_victoryKey) return;
     const bool now = (GetAsyncKeyState(VK_F9) & 0x8000) != 0;
-    if (now && !down && InLevel()) EndLevel("F9, instant victory");
+    if (now && !down && InLevel()) { PlayersVictoryKey(); EndLevel("F9, instant victory"); }
     down = now;
 }
 

@@ -23,9 +23,18 @@ static __declspec(naked) void KillExpOrig()   // 0x40D110: sub esp,14h; mov edx,
     }
 }
 
+// The game's own credit of a kill (index in EAX, [esp+8] the victim): Players.cpp counts the kills its hits did not see
+// (trolls and bosses are hit through calls without an attacker, 0x41FE56, 0x426CA5...: test of 01/11/2026, the trolls
+// of the Palantirs were missing). All registers are kept.
 static __declspec(naked) void KillExp()
 {
     __asm {
+        pushad
+        push dword ptr [esp + 0x28]   // the victim (0x20 of pushad + 8)
+        push eax                      // the player's index
+        call PlayersGameKill
+        add  esp, 8
+        popad
         cmp  eax, 2
         jb   plain
         cmp  eax, 3

@@ -2,6 +2,9 @@
 ; Placeholders: {label} name of the menu entry, {n} a number, {hero} a hero name.
 ; Keep the texts short and, if possible, without accented letters (the menu font of the game may not have them).
 ; "Player" is normally taken from the game's own text; this one is used when Language is set by hand.
+; The texts of the Fellowship pages can be replaced the same way, by their key: the keys are the first column of the
+; table kTxt at the top of src/Players.cpp (for example PlayersMenu, PlayersStats, TabGames, StatKills). Placeholders
+; there: {name}, {player}, {other}, {n}, {k}, {a}, {d}, {hero}, as in the built-in text.
 
 [en]
 Coop=Co-op
@@ -10,6 +13,8 @@ Players={label}: {n} players
 Player=Player {n}
 Winner=Player {n} wins: {hero}
 Draw=Draw
+PlayersMenu=Fellowship
+TabFoes=Enemies
 
 [it]
 Coop=Cooperativo
@@ -18,3 +23,5 @@ Players={label}: {n} giocatori
 Player=Giocatore {n}
 Winner=Vince il giocatore {n}: {hero}
 Draw=Pareggio
+PlayersMenu=Compagnia
+TabFoes=Nemici

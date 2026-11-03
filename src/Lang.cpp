@@ -50,7 +50,7 @@ bool GameTextRaw(const char* key, char* out, size_t n)
 
 std::string GameText(const char* key)
 {
-    char buf[64];
+    char buf[96];
     return GameTextRaw(key, buf, sizeof buf) ? std::string(buf) : std::string();
 }
 
@@ -98,6 +98,14 @@ void Replace(std::string& s, const char* token, const std::string& value)
 }
 
 }  // namespace
+
+std::string LangCode()
+{
+    Detect();
+    return g_lang.empty() ? "en" : g_lang;
+}
+
+std::string LangGameText(const char* key) { return GameText(key); }
 
 // id: 0 Coop, 1 Pvp, 2 Players, 3 Player, 4 Winner, 5 Draw
 std::string LangText(int id, int n, const char* hero, const char* label)

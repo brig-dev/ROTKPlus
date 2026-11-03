@@ -15,7 +15,7 @@
 #include <stdint.h>
 #include <string>
 
-#define ROTKPLUS_VERSION "1.1.0"
+#define ROTKPLUS_VERSION "1.2.0"
 
 // Call a naked trampoline (one that continues into the game's code) from C++: GameFn((type)&Trampoline)(...).
 // When it sees a static naked function in the same translation unit, MSVC may assume that it does not touch the
@@ -66,6 +66,7 @@ int  HeroOfSlot(int slot);        // hero of an extra player (slot 2 = third, 3 
 // --- Pads.cpp: controllers of the third and fourth player (SDL3) -----------------------------------------------
 bool PadsInstall(const char* padName);
 bool PadConnected(int slot);      // controller opened for slot 2 (third) or 3 (fourth)
+std::string PadKeyOfSlot(int slot);   // a stable key of that controller (serial or path, hashed), "" if none
 
 // --- Sim.cpp: keyboard-simulated controllers for testing ([Debug] SimPads=1) ------------------------------
 void SimInstall(bool on);
@@ -82,10 +83,46 @@ bool CharSelOnChoice(int player, int hero);   // from 0x47DF00/0x47DF20: true = 
 int  CoopPlayers();                           // players chosen in the main menu: 2, 3 or 4 (2 if the mod is off)
 bool Coop3Wanted();                           // at least 3 players
 bool Coop4Wanted();                           // 4 players
+void MenuIdleReset();                         // the main menu is in use: its demo timer starts again
 
 // --- Lang.cpp: texts in the game's language ---------------------------------------------------------------------
 // id: 0 Co-op menu entry, 1 Versus menu entry, 2 "{label}: {n} players", 3 "Player {n}", 4 winner, 5 draw
 std::string LangText(int id, int n = 0, const char* hero = "", const char* label = "");
 
+std::string LangCode();                       // language of the mod's texts: "en", "it", ...
+std::string LangGameText(const char* key);    // the game's own text for a key, in its language ("" if none)
+
 // --- Hud.cpp: HUD of the third and fourth player -----------------------------------------------------------------
 bool HudInstall(float dx, float dy, bool row, float rowScale);
+bool DrawHookInstall();                       // hook of the screen elements' drawing (0x4FD590), installed once
+void DrawGameElement(uint8_t* e);             // draws one screen element with the drawing origin at the top left
+bool HudTextTemplate(uint8_t* out);           // copies the HUD's text element (0xB0 bytes), false if not there
+void FastTextInstall(int mode);               // [General] FastText: texts drawn in one go (1 the mod's, 2 all, 0 off)
+
+// --- Players.cpp: names of the players and their statistics ------------------------------------------------------
+void        PlayersInstall();
+bool        PlayersEnabled();
+bool        PlayerHasName(int slot);          // slot 0..3 has a name of its own
+std::string PlayerName(int slot);             // the name, or "Player N" in the game's language
+std::string PlayersMenuLabel();               // text of the "Players" entry of the main menu
+std::string PlayersChooseText();              // "choose your hero", the end of the named label in the hero selection
+bool        PlayersPageOpen();                // the players' page is open in the main menu
+bool        PlayersMenuAction(int action, bool onEntry, int slot);   // menu action taken by the page (true = used)
+bool        PlayersAskWhoPlays();             // "Who is playing?" before every game ([Players] AskWhoPlays)
+bool        PlayersOpenLineup(int n);         // opens "Who is playing?" for n players (false = not shown)
+bool        PlayersLineupDone();              // Start was just confirmed (read once): run the entry's confirmation
+void        PlayersScriptCall(int id, uint32_t code, const float* args);   // Players.cpp: the trace of what the level does
+void        PlayersVictoryKey();                 // Players.cpp: F9 ended the level (not counted as completed)
+void        IconsFrame(bool newLevel);        // Icons.cpp: the portraits taken while playing
+void        PlayersFrame();                   // keyboard of the name editor
+void        PlayersAfterDraw(uint32_t e);     // draws the page after the main menu's root
+void        PlayersLevelStart(const char* level);   // a game level is being loaded ("min02")
+void        PlayersLevelLeave(bool won);      // the level is left (won = towards the score screen)
+void        PlayersOnFall(uint32_t c);        // a player enters the "die" state
+void        PlayersPvpEnd(int winner);        // a versus game is over: winner's slot, -1 draw
+void __cdecl PlayersGameKill(int index, uint32_t victim);   // HeroIndex.cpp: the game credits a kill (0x40D110)
+std::string PlayersWinnerText(int slot, const char* hero);   // "Alex wins: Gandalf", "" if the player has no name
+void        PlayersPadOpened(int slot, const std::string& key);   // Pads.cpp: a controller opened for slot 2 or 3
+bool        PlayersHeadNames();               // names above the players' heads ([Players] HeadNames)
+bool        PlayersHudNames();                // names next to the HUD boxes ([Players] HudNames)
+float       PlayersNameScale();               // size of those names ([Players] NameScale)

@@ -18,7 +18,9 @@ import sys
 from collections import Counter
 
 # ROTKFix.dll sizes of the versions we know (the 1.1+ log lists the file sizes of the fix and of its companions)
-ROTKFIX_SIZES = {412672: "ROTK Fix 1.5", 418304: "ROTK Fix 1.6.0"}
+ROTKFIX_SIZES = {412672: "ROTK Fix 1.5", 418304: "ROTK Fix 1.6.0", 422400: "ROTK Fix 1.7.1",
+                 426496: "ROTK Fix 1.7.2", 462848: "ROTK Fix 1.7.3", 464384: "ROTK Fix 1.7.5, 1.7.6 or 1.7.7",
+                 472064: "ROTK Fix 1.7.8", 474624: "ROTK Fix 1.8.0"}
 
 
 def find_log(path):
@@ -44,6 +46,8 @@ EXPECTED = [
     ("extra players' turns in the end-of-level screens:", "turns in the end-of-level screens", "coop"),
     ("co-op with 3 or 4 players: installed", "co-op with 3 or 4 players", "coop"),
     ("pvp: versus mode patches", "versus mode", "pvp"),
+    ("player names and statistics:", "player names and statistics", "players"),
+    ("sound banks: ", "sound banks for the extra heroes (music with 3-4 players)", "banks"),
 ]
 MENU_BAD = "main menu: choice of the number of players NOT installed"
 
@@ -137,6 +141,7 @@ def main(argv):
         m = re.search(r"\b" + key + r"=(-?\d+)", ini or "")
         return int(m.group(1)) != 0 if m else bool(default)
     coop_on = ini_flag("Enabled")
+    new_version = int(re.match(r"1\.(\d+)", version).group(1)) >= 2   # 1.2 and later
     switched = {
         "always": True,
         "coop": coop_on,
@@ -144,6 +149,11 @@ def main(argv):
         "hud": coop_on and ini_flag("Hud"),
         "pvp": not any(t.startswith("pvp: off") for t in texts),
         "sim": any(t.startswith("sim: ") for t in texts),
+        # names and statistics: from ROTKPlus 1.2, installed by the co-op, off with [Players] Enabled=0
+        "players": coop_on and new_version
+                   and not any(t.startswith("player names and statistics: off") for t in texts),
+        # the sound banks moved to tables of 32: from ROTKPlus 1.2, off with [Coop] SoundBanks=0
+        "banks": coop_on and new_version and not any(t.startswith("sound banks: the game's 7 places") for t in texts),
     }
     if not coop_on:
         print("Co-op is switched off in ROTKPlus.ini ([Coop] Enabled=0): ROTKPlus changes almost nothing, and the "
@@ -152,9 +162,10 @@ def main(argv):
     # Patches
     print("\nPatches:")
     for prefix, what, when in EXPECTED:
-        line = next((t for t in texts if t.startswith(prefix)), None)
+        # ("unexpected code at ..." comes before the line that reports the group as NOT installed)
+        line = next((t for t in texts if t.startswith(prefix) and "unexpected code" not in t), None)
         if not switched[when]:
-            if when != "sim":
+            if when != "sim" and (when not in ("players", "banks") or new_version):   # (not in 1.1)
                 print(f"  off      {what} (switched off in ROTKPlus.ini)")
             continue
         if line is None:
@@ -239,6 +250,21 @@ def main(argv):
     if any("end of level" in t for t in texts):
         n = sum(1 for t in texts if t.startswith("end of level"))
         print(f"  End-of-level events: {n}" + (" (includes F9 instant victory, a test key)" if any("F9" in t for t in texts) else ""))
+    # names and statistics of the players (1.2 and later): one line per player at the end of each level
+    results = [t for t in texts if t.startswith("players: ") and (" level won " in t or " level left " in t or " versus game " in t
+                                                                  or "loaded again (retry)" in t)]
+    for t in results[:12]:
+        print("  " + t[len("players: "):])
+    if len(results) > 12:
+        print(f"  ... and {len(results) - 12} more lines of player statistics")
+    # streams of the audio engine (1.2 diagnostics): how many at most, how many stopped or refused to make room
+    lists = [t for t in texts if t.startswith("audio: streams now: ")]
+    if lists:
+        most = max(int(re.match(r"audio: streams now: (\d+)", t).group(1)) for t in lists)
+        stopped = sum(1 for t in texts if t.startswith("audio: ") and "STOPPED one" in t)
+        higher = sum(1 for t in texts if t.startswith("audio: ") and "all higher" in t)
+        print(f"  Audio streams: {len(lists)} changes, at most {most} at once, {stopped} stopped for a new one, "
+              f"{higher} times only higher-priority streams")
 
     # Repeated lines (a sign of a loop)
     cnt = Counter(re.sub(r"[0-9A-F]{8}|\d+(\.\d+)?", "#", t) for t in texts)

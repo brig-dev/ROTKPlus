@@ -14,9 +14,13 @@
 //      player 3: I J K L move, U cross, O circle, P square, Y triangle, H R2
 //      player 4: numpad 8 4 5 6 move (Num Lock on), Num0 cross, Num. circle, Num1 square, Num2 triangle, Num3 R2
 //    Movement keys also set the digital direction buttons, so the menus can be navigated; cross confirms, circle cancels.
-//    During an extra player's turn in the menus (hero selection, score, statistics, shop) only that player's pad is
-//    read, so for that player Enter and Space also count as cross, Escape and Backspace as circle, and W A S D as the
-//    directions: the keys you use for player 1 work for whoever's turn it is.
+//    In the menus (hero selection, score, statistics, shop) Enter and Space also count as cross, Escape and Backspace as
+//    circle, and W A S D as the directions for whoever's turn it is, so one set of keys drives every turn:
+//     - player 3 or 4: during their turn (Screens.cpp lets only that player's pad through, ScreensOnlySlot);
+//     - player 2: during the turns the game itself gives to player 2, recognised because the game excludes player 1's
+//       slot from the menus (0x4EA200 writes the excluded slot to 0x56DC75: 0 = player 1's).
+//    A key that is already held when such a turn starts is ignored until it is released: the Enter that confirmed the
+//    previous player's choice must not also confirm the next one.
 // A single person can therefore drive up to four characters one at a time (the others stand still), which is enough to
 // look at the creation of the players, the HUD, deaths and respawns, the hero selection and the end-of-level screens.
 #include "ROTKPlus.h"
@@ -34,6 +38,7 @@ static const uintptr_t kRecordBase = 0x99CBA0;
 static const uintptr_t kButtonBit  = 0x99CB60;   // uint16 per id
 
 static uint16_t g_last[3];
+static bool     g_sharedBlocked[3];   // the shared keys were held when this slot's turn started: wait for their release
 int ScreensOnlySlot();   // Screens.cpp
 
 bool SimActive() { return g_sim; }
@@ -47,13 +52,45 @@ static bool GameHasFocus()
 
 static bool Down(int vk) { return (GetAsyncKeyState(vk) & 0x8000) != 0; }
 
+static bool InMenus() { return *(const int*)0x562AC0 != 0; }   // screen mode 0 = playing a level
+
+// The menu turn of this simulated player, in which player 1's keys also work for it (see the top of the file)
+static bool SharedKeysTurn(int slot)
+{
+    if (!InMenus()) return false;
+    const int only = ScreensOnlySlot();
+    if (slot >= 2) return only == slot;
+    return only < 0 && *(const uint8_t*)0x56DC75 == 0;   // player 2: the game has excluded player 1's slot
+}
+
+static bool AnySharedKeyDown()
+{
+    for (int vk : { (int)VK_RETURN, (int)VK_SPACE, (int)VK_ESCAPE, (int)VK_BACK, (int)'W', (int)'A', (int)'S', (int)'D' })
+        if (Down(vk)) return true;
+    return false;
+}
+
 // fills the input record of the slot (1..3) from the keyboard; the same fields a real pad writes (Pads.cpp)
 static void SimSlot(int slot)
 {
     const SimKeys& k = kKeys[slot - 1];
     uint8_t* rec = (uint8_t*)(kRecordBase + slot * 0x58);
     const bool focus = GameHasFocus();
-    const bool turn = focus && ScreensOnlySlot() == slot;   // this player's turn in the menus: player 1's keys work too
+    // this player's turn in the menus: player 1's keys work too, once the keys held when the turn started are released
+    bool turn = focus && SharedKeysTurn(slot);
+    bool& blocked = g_sharedBlocked[slot - 1];
+    if (!turn) blocked = AnySharedKeyDown();
+    else if (blocked && !AnySharedKeyDown()) blocked = false;
+    turn = turn && !blocked;
+    if (slot == 1) {   // log the turns recognised for player 2, to check the rule on the excluded slot
+        static int lastTurn = -1, logged;
+        if ((int)turn != lastTurn && logged < 40) {
+            ++logged;
+            Log("sim: player 2's menu turn %s (mode %d, excluded slot %d)", turn ? "on" : "off", *(const int*)0x562AC0,
+                *(const uint8_t*)0x56DC75);
+        }
+        lastTurn = turn;
+    }
     const bool up = focus && (Down(k.up) || (turn && Down('W'))), down = focus && (Down(k.down) || (turn && Down('S')));
     const bool left = focus && (Down(k.left) || (turn && Down('A'))), right = focus && (Down(k.right) || (turn && Down('D')));
     float* stick = (float*)(rec + 0x10);

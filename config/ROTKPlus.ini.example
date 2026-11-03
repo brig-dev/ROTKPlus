@@ -25,6 +25,9 @@ PadName=
 Hud=1
 HudX=0
 HudY=-0.72
+; 1 = room for the sound banks of every hero (the game has 7 places; with 4 players the music and other sounds went
+; silent until a cutscene). 0 only to compare with the game's own behaviour
+SoundBanks=1
 
 [PvP]
 ; 1 = the "Versus" entry in the main menu (confirm it and the players can hit each other; any level works)
@@ -34,14 +37,46 @@ Players=2
 ; lives per player: whoever loses them stays on the ground; the last one standing wins and the level closes
 Lives=2
 
+[Players]
+; 1 = the "Fellowship" entry in the main menu ("Compagnia" in Italian): a name for each player and statistics per name (kills, assists, deaths, levels,
+; Versus games...), added up over the sessions in ROTKPlus_players.ini (game folder). 0 = no entry, nothing is counted
+Enabled=1
+; 1 = "Who is playing?" after Single, Co-op or Versus: each place gets its name (last line-up proposed, Guest = no
+; statistics). 0 = the names set in the Fellowship page are used
+AskWhoPlays=1
+; size of the texts of the Fellowship page (1 = as the menu's entries) and of the statistics table
+TextScale=0.8
+TableScale=0.6
+; the dark see-through rectangle behind the pages, for reading on the bright picture: 0 = none, 1 = black
+Shade=0.55
+; names above the players' heads in place of the letters g1-g4 (1, the default; 0 = the letters), and above the HUD
+; boxes (0, the default; 1 = shown); their size
+HeadNames=1
+HudNames=0
+NameScale=0.8
+; summary of the level at the top of the score screen (0, the default: only in the "Last game" page): 1 = shown, its
+; size and height (fraction of the screen from the top)
+ScoreSummary=0
+SummaryScale=0.8
+SummaryY=0.02
+; the portraits in front of the heroes and the kinds of enemy: 1 = made from the game's own portraits the first time
+; the game shows them (files in ROTKPlus_icons, game folder; an icon already there is never replaced); 0 = not made
+CaptureIcons=1
+
 [General]
 ; language of the mod's own texts: auto (recognised from the game), en, it, fr, de, es, or a code of your own that
 ; has a section in ROTKPlus.lang.ini
 Language=auto
+; texts drawn in one go instead of a letter at a time (the game's way, slow under DXVK: the mod's pages fell to
+; 40-55 fps): 1 = the mod's texts (the default), 2 = also every text of the game (menus, HUD), 0 = as the game does
+FastText=1
 
 [Diag]
 ; for testing only: F9 in a level ends it with a victory (to look at the end-of-level screens without playing)
 VictoryKey=0
+; for testing only: 1 = the game's audio streams (music, spoken lines) in the log: which ones play and which are
+; stopped to make room for others (to study sounds that go silent)
+AudioLog=0
 
 [Debug]
 ; for testing only: 1 = players 2, 3 and 4 are driven by the keyboard, so the co-op can be tried without any controller
@@ -51,8 +86,15 @@ SimPads=0
 [Log]
 ; Every start of the game writes a new log, ROTKPlus_logs\ROTKPlus_<date>_<time>.log, and leaves the earlier ones alone.
 ; ROTKPlus.log in the game folder is a copy of the latest session. Attach the log of the session you are reporting.
-; Detail: 1 = also a snapshot of the players every 60 s and the game's statistics at the start and end of levels
-; (a few lines per minute); 0 = only the events
-Detail=1
+; Detail: 0 = only the events (the default); 1 = also a detailed trace of every level (a snapshot of the players every
+; 60 s, the game's statistics at the start and end of levels, every kill, hit, pick-up, the level's script calls and
+; effects): turn it on when you report a problem with the statistics
+Detail=0
 ; Keep: how many session logs to keep; 0 = never delete (an hour of play is usually well under 100 KB)
 Keep=0
+; StatsBackups: at every start, if ROTKPlus_players.ini changed since its last copy, a copy of it with the date and time
+; in ROTKPlus_logs; the newest N are kept (0 = no copies)
+StatsBackups=10
+; CopyRotkFixLog: 1 = when the game closes, a copy of ROTK Fix's own log (which it overwrites at every start) next to
+; the session's log, with the same date and time; 0 = no copy
+CopyRotkFixLog=1

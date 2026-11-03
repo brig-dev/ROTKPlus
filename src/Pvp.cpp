@@ -371,6 +371,7 @@ static void Celebrate(uint32_t c)
 
 static void __cdecl DieEnter(uint32_t x, uint32_t c, uint32_t y)
 {
+    if (IsPlayer(c)) PlayersOnFall(c);   // statistics of the players (Players.cpp), every mode
     if (InCoop() && IsPlayer(c)) {   // log of falls (co-op and versus)
         static int n;
         if (n++ < 200)
@@ -395,12 +396,15 @@ static void __cdecl DieEnter(uint32_t x, uint32_t c, uint32_t y)
                     g_over = true;
                     char text[96];
                     if (last >= 0) {
-                        lstrcpynA(text, ("@" + LangText(4, last + 1, HeroName(g_players[last]))).c_str(), sizeof text);
+                        const std::string named = PlayersWinnerText(last, HeroName(g_players[last]));
+                        lstrcpynA(text, ("@" + (named.empty() ? LangText(4, last + 1, HeroName(g_players[last])) : named)).c_str(),
+                                  sizeof text);
                         Log("pvp: versus game over, player %d (%s) wins", last + 1, HeroName(g_players[last]));
                     } else {
                         lstrcpynA(text, ("@" + LangText(5)).c_str(), sizeof text);
                         Log("pvp: versus game over, draw");
                     }
+                    PlayersPvpEnd(last);
                     if (last >= 0) Celebrate(g_players[last]);
                     HudBanner(text, 6000);
                     g_endAt = GetTickCount() + 6000;
@@ -440,15 +444,17 @@ void PvpInstall()
     g_allowed = IniInt("PvP", "Enabled", 1) != 0;
     g_lives = IniInt("PvP", "Lives", 2);
     if (g_lives < 1) g_lives = 1;
+    // the "die" state of the players: log of the falls and deaths in the players' statistics also without the versus
+    // mode (its own rules act only while a versus game is in progress)
+    bool ok = PatchDword(0x56142C, 0x434ED0, (uint32_t)(uintptr_t)&DieEnter);
+    ok &= PatchDword(0x561428, 0x434D80, (uint32_t)(uintptr_t)&DieUpdate);
     if (!g_allowed) { Log("pvp: off ([PvP] Enabled=0)"); return; }
     static const uint8_t a[] = { 0x8A, 0x51, 0x02, 0x80, 0xFA, 0x05 };
     static const uint8_t b[] = { 0x8A, 0x48, 0x02, 0x80, 0xF9, 0x05 };
     static const uint8_t c[] = { 0x8A, 0x41, 0x02, 0x3C, 0x05 };
-    bool ok = PatchCallSite(0x415274, a, sizeof a, (const void*)&TypeStubA);
+    ok &= PatchCallSite(0x415274, a, sizeof a, (const void*)&TypeStubA);
     ok &= PatchCallSite(0x415474, b, sizeof b, (const void*)&TypeStubB);
     ok &= PatchCallSite(0x4157A6, c, sizeof c, (const void*)&TypeStubC);
-    ok &= PatchDword(0x56142C, 0x434ED0, (uint32_t)(uintptr_t)&DieEnter);
-    ok &= PatchDword(0x561428, 0x434D80, (uint32_t)(uintptr_t)&DieUpdate);
     // R2 (victim on the ground) and Gandalf's area magic
     ok &= PatchDword(0x435F0D, 0x435E20, (uint32_t)(uintptr_t)&KillPick);
     ok &= PatchDword(0x4360ED, 0x435F50, (uint32_t)(uintptr_t)&KillNear);

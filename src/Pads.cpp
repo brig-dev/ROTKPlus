@@ -16,6 +16,7 @@
 // Update: after 0x4AAC10 (axes), called every frame from 0x4ABE67, right after the buttons.
 #include "ROTKPlus.h"
 #include <string.h>
+#include <stdio.h>
 
 typedef uint32_t SDL_JoystickID;
 struct SDL_Gamepad;
@@ -32,6 +33,8 @@ static const char*     (__cdecl* pGetName)(SDL_Gamepad*);
 static SDL_Gamepad*    (__cdecl* pFromId)(SDL_JoystickID);
 static const char*     (__cdecl* pNameForId)(SDL_JoystickID);
 static void            (__cdecl* pFree)(void*);
+static const char*     (__cdecl* pGetSerial)(SDL_Gamepad*);   // optional: SDL_GetGamepadSerial
+static const char*     (__cdecl* pGetPath)(SDL_Gamepad*);     // optional: SDL_GetGamepadPath
 
 // two extra controllers: the third player (input slot 2) and the fourth (slot 3, searched only when 4 players are chosen)
 struct ExtraPad { SDL_Gamepad* pad; SDL_JoystickID id; DWORD nextScan; uint16_t lastBits; };
@@ -54,6 +57,8 @@ static bool LoadSdl()
     pFree             = (decltype(pFree))GetProcAddress(m, "SDL_free");
     pFromId           = (decltype(pFromId))GetProcAddress(m, "SDL_GetGamepadFromID");
     pNameForId        = (decltype(pNameForId))GetProcAddress(m, "SDL_GetGamepadNameForID");
+    pGetSerial        = (decltype(pGetSerial))GetProcAddress(m, "SDL_GetGamepadSerial");
+    pGetPath          = (decltype(pGetPath))GetProcAddress(m, "SDL_GetGamepadPath");
     return pGetGamepads && pOpenGamepad && pGamepadConnected && pGetAxis && pGetButton && pGetName && pFree &&
            pFromId && pNameForId;
 }
@@ -83,8 +88,29 @@ static void FindPad(int slot)
         e.pad = pOpenGamepad(e.id);
         if (e.pad) Log("pad of player %d: \"%s\" (%d controllers connected%s)", slot + 1, name ? name : "?", n,
                        want[0] ? ", chosen by name" : ", the first free one");
+        if (e.pad) PlayersPadOpened(slot, PadKeyOfSlot(slot));   // a known controller brings back its player's name
     }
     if (ids) pFree(ids);
+}
+
+// A key that stays the same for a controller (Players.cpp remembers names by it): SDL's serial number if the controller
+// has one (DualSense, DualShock 4, Switch Pro), otherwise its device path (the same as long as it is plugged into the same
+// port or paired the same way). Hashed (FNV-1a, 64 bit), because paths have characters an ini key cannot hold. "" if the
+// slot has no controller.
+std::string PadKeyOfSlot(int slot)
+{
+    if (slot < 2 || slot > 3) return "";
+    SDL_Gamepad* pad = g_ep[slot - 2].pad;
+    if (!pad) return "";
+    const char* serial = pGetSerial ? pGetSerial(pad) : nullptr;
+    const char* path = pGetPath ? pGetPath(pad) : nullptr;
+    const char* src = serial && serial[0] ? serial : path && path[0] ? path : nullptr;
+    if (!src) return "";
+    uint64_t h = 1469598103934665603ull;
+    for (const char* p = src; *p; ++p) { h ^= (uint8_t)*p; h *= 1099511628211ull; }
+    char key[32];
+    sprintf_s(key, "%s%016llx", serial && serial[0] ? "S" : "P", (unsigned long long)h);
+    return key;
 }
 
 static float Axis(SDL_Gamepad* pad, int a)
