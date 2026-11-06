@@ -1,5 +1,5 @@
 // HeroIndex.cpp - game functions that pick the hero with "index 0 -> player 1, otherwise -> player 2"
-// Language: C++17, MSVC, Win32.
+// Language: C++17, MSVC or mingw-w64 g++, Win32.
 //
 // Many functions choose a player's hero like this: index 0 -> 0x47EF60 (hero of player 1), otherwise ->
 // 0x47EF80 (hero of player 2). For the third player (index 2) they used the hero of player 2: kills by Gimli gave
@@ -10,81 +10,82 @@
 //  - 0x417E70(character, x): called from 11 places; looks at the index at +0x690 of the character.
 #include "ROTKPlus.h"
 
-extern volatile int g_spawningP3;   // Coop.cpp
+static void KillExpOrig() ASM_NAME(KillExpOrig);
+static void HeroOfCharOrig() ASM_NAME(HeroOfCharOrig);
 
 // trampolines: the first instructions copied, then the rest of the function
-static __declspec(naked) void KillExpOrig()   // 0x40D110: sub esp,14h; mov edx,[573E48h]
+static NAKED void KillExpOrig()   // 0x40D110: sub esp,14h; mov edx,[573E48h]
 {
-    __asm {
-        sub  esp, 0x14
-        mov  edx, dword ptr ds:[0x573E48]
-        push 0x40D119
-        ret
-    }
+    ASM_BEGIN
+    ASM(sub  esp, 0x14)
+    ASM(mov  edx, dword ptr ds:[0x573E48])
+    ASM(push 0x40D119)
+    ASM(ret)
+    ASM_END
 }
 
 // The game's own credit of a kill (index in EAX, [esp+8] the victim): Players.cpp counts the kills its hits did not see
 // (trolls and bosses are hit through calls without an attacker, 0x41FE56, 0x426CA5...: test of 01/11/2026, the trolls
 // of the Palantirs were missing). All registers are kept.
-static __declspec(naked) void KillExp()
+static NAKED void KillExp()
 {
-    __asm {
-        pushad
-        push dword ptr [esp + 0x28]   // the victim (0x20 of pushad + 8)
-        push eax                      // the player's index
-        call PlayersGameKill
-        add  esp, 8
-        popad
-        cmp  eax, 2
-        jb   plain
-        cmp  eax, 3
-        ja   plain
-        lea  edx, [eax - 1]
-        mov  g_spawningP3, edx
-        push dword ptr [esp + 8]
-        push dword ptr [esp + 8]
-        call KillExpOrig
-        add  esp, 8
-        mov  g_spawningP3, 0
-        ret
-    plain:
-        jmp  KillExpOrig
-    }
+    ASM_BEGIN
+    ASM(pushad)
+    ASM(push dword ptr [esp + 0x28]) // the victim (0x20 of pushad + 8)
+    ASM(push eax)                    // the player's index
+    ASM(call PlayersGameKill)
+    ASM(add  esp, 8)
+    ASM(popad)
+    ASM(cmp  eax, 2)
+    ASM(jb   KillExp_plain)
+    ASM(cmp  eax, 3)
+    ASM(ja   KillExp_plain)
+    ASM(lea  edx, [eax - 1])
+    ASM(mov  dword ptr [g_spawningP3], edx)
+    ASM(push dword ptr [esp + 8])
+    ASM(push dword ptr [esp + 8])
+    ASM(call KillExpOrig)
+    ASM(add  esp, 8)
+    ASM(mov  dword ptr [g_spawningP3], 0)
+    ASM(ret)
+ASM(KillExp_plain:)
+    ASM(jmp  KillExpOrig)
+    ASM_END
 }
 
-static __declspec(naked) void HeroOfCharOrig()   // 0x417E70: push esi; push edi; mov edi,[esp+0Ch]
+static NAKED void HeroOfCharOrig()   // 0x417E70: push esi; push edi; mov edi,[esp+0Ch]
 {
-    __asm {
-        push esi
-        push edi
-        mov  edi, dword ptr [esp + 0x0C]
-        push 0x417E76
-        ret
-    }
+    ASM_BEGIN
+    ASM(push esi)
+    ASM(push edi)
+    ASM(mov  edi, dword ptr [esp + 0x0C])
+    ASM(push 0x417E76)
+    ASM(ret)
+    ASM_END
 }
 
-static __declspec(naked) void HeroOfChar()
+static NAKED void HeroOfChar()
 {
-    __asm {
-        mov  ecx, dword ptr [esp + 4]
-        test ecx, ecx
-        jz   plain
-        mov  edx, dword ptr [ecx + 0x690]
-        cmp  edx, 2
-        jb   plain
-        cmp  edx, 3
-        ja   plain
-        dec  edx
-        mov  g_spawningP3, edx
-        push dword ptr [esp + 8]
-        push dword ptr [esp + 8]
-        call HeroOfCharOrig
-        add  esp, 8
-        mov  g_spawningP3, 0
-        ret
-    plain:
-        jmp  HeroOfCharOrig
-    }
+    ASM_BEGIN
+    ASM(mov  ecx, dword ptr [esp + 4])
+    ASM(test ecx, ecx)
+    ASM(jz   HeroOfChar_plain)
+    ASM(mov  edx, dword ptr [ecx + 0x690])
+    ASM(cmp  edx, 2)
+    ASM(jb   HeroOfChar_plain)
+    ASM(cmp  edx, 3)
+    ASM(ja   HeroOfChar_plain)
+    ASM(dec  edx)
+    ASM(mov  dword ptr [g_spawningP3], edx)
+    ASM(push dword ptr [esp + 8])
+    ASM(push dword ptr [esp + 8])
+    ASM(call HeroOfCharOrig)
+    ASM(add  esp, 8)
+    ASM(mov  dword ptr [g_spawningP3], 0)
+    ASM(ret)
+ASM(HeroOfChar_plain:)
+    ASM(jmp  HeroOfCharOrig)
+    ASM_END
 }
 
 bool HeroInstall()

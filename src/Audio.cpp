@@ -1,5 +1,5 @@
 // Audio.cpp - diagnostics of the game's audio streams (music, voices)
-// Language: C++17, MSVC, Win32.
+// Language: C++17, MSVC or mingw-w64 g++, Win32.
 //
 // With 3 or 4 players the music stops in the middle of a level (with the game's own sound it comes back after a while,
 // with ROTK Fix's DSOAL / OpenAL Soft it does not). What is known of the audio engine (EA, "Audio\Engine"):
@@ -26,7 +26,14 @@
 
 static bool g_on;
 static int  g_lines;
-static const int kMaxLines = 3000;
+static const int kMaxLines = 3000;   // a level (test of 04/11/2026: a session's versus games used them all before the
+                                     // Black Gate's boss)
+
+void AudioNewLevel()
+{
+    if (g_on && g_lines >= kMaxLines) Log("audio: the log starts again for the new level");
+    g_lines = 0;
+}
 
 // + the factors of its voices' volume. 0x466E60 computes gain = 0x99D6A0[group] (0 if the group's bit is set in the
 // mask 0x99D69C) x the entry's +0x60, the group being +3 of the sound definition at +0x30, and calls the entry's volume
@@ -41,7 +48,7 @@ struct StreamInfo { uint32_t entry, def; int state; int kind, base, eff; float v
 static int ReadStreams(StreamInfo* out, int max)
 {
     int n = 0;
-    __try {
+    Guard([&] {
         uint32_t e = *(const uint32_t*)0x5A1650;
         for (int guard = 0; e && guard < 16 && n < max; ++guard) {
             StreamInfo& s = out[n++];
@@ -69,7 +76,7 @@ static int ReadStreams(StreamInfo* out, int max)
             }
             e = *(const uint32_t*)(e + 4);
         }
-    } __except (EXCEPTION_EXECUTE_HANDLER) {}
+    });
     return n;
 }
 
@@ -95,13 +102,13 @@ static void LogStreams(const char* why)
     Describe(s, n, buf, sizeof buf);
     int freeSlots = -1, flag3d = -1, flagVol = -1, banks = -1;
     uint32_t mask = 0;
-    __try {
+    Guard([&] {
         freeSlots = *(const int*)0x5A1668;
         mask = *(const uint32_t*)0x99D69C;
         flag3d = *(const uint8_t*)0x5A15FB;
         flagVol = *(const uint8_t*)0x5A12DA;
         banks = *(const uint8_t*)0x5A15F9;   // next sound bank slot (MoveSoundBanks)
-    } __except (EXCEPTION_EXECUTE_HANDLER) {}
+    });
     ++g_lines;
     Log("audio: %s: %d streams, %d places free (mask %X, flags %d %d, banks %d) %s", why, n, freeSlots, mask, flag3d,
         flagVol, banks, buf);
@@ -126,7 +133,7 @@ struct VoiceState { uint32_t buf; unsigned long status, play; long vol; int movi
 static bool ReadVoice(int i, VoiceState& v)
 {
     v = VoiceState{ 0, 0, 0, 0, -1, 0, 0, 0.0f };
-    __try {
+    return Guard([&] {
         const uint8_t* e = (const uint8_t*)(0x5A0950 + i * 0x30);
         const uint32_t shared = (*(const uint32_t*)e >> 18) & 3;
         if (shared) e = (const uint8_t*)(0x5A08F0 + (shared - 1) * 0x30);
@@ -134,14 +141,13 @@ static bool ReadVoice(int i, VoiceState& v)
         v.engVol = *(const int16_t*)(e + 0x10);
         v.factor = *(const float*)(e + 0x18);
         v.buf = *(const uint32_t*)(e + 0x24);
-        if (!v.buf) return true;
+        if (!v.buf) return;
         void** vt = *(void***)(uintptr_t)v.buf;
         unsigned long write = 0;
         if (((DsbGetStatus)vt[9])((void*)(uintptr_t)v.buf, &v.status) < 0) v.status = 0xFFFFFFFF;
         if (((DsbGetPos)vt[4])((void*)(uintptr_t)v.buf, &v.play, &write) < 0) v.play = 0xFFFFFFFF;
         if (((DsbGetVolume)vt[6])((void*)(uintptr_t)v.buf, &v.vol) < 0) v.vol = 1;   // hundredths of dB, 0 = full
-        return true;
-    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+    });
 }
 
 static void WatchStreamVoices()
@@ -204,16 +210,18 @@ static void LogEffectVoices()
 // pause / stop / play vo ..." handlers at 0x45DB30..0x45DFB0 call it, and so does the game's code). Fourth test of
 // 30/10/2026: the stream of kind 0 plays at volume 0 from the start, the music heard is a stream of kind 2 at priority
 // 90; what decides those volumes is still unknown. Written, with the caller, for every command but the plain plays of
-// sound effects (1 and 9, very frequent).
-static __declspec(naked) void AudioCmdOrig()   // sub esp,8; push ebx; mov ebx,[esp+10h]
+// sound effects (1 and 9, very frequent), which are written only when a level script asks for them (the "audio: play"
+// handler 0x45DB30, caller 0x45DB6C): they are the numbers [PvP] Cheer_<level> needs (Pvp.cpp), such as the crowd of the
+// Black Gate.
+static NAKED void AudioCmdOrig()   // sub esp,8; push ebx; mov ebx,[esp+10h]
 {
-    __asm {
-        sub  esp, 8
-        push ebx
-        mov  ebx, dword ptr [esp + 0x10]
-        push 0x461938
-        ret
-    }
+    ASM_BEGIN
+    ASM(sub  esp, 8)
+    ASM(push ebx)
+    ASM(mov  ebx, dword ptr [esp + 0x10])
+    ASM(push 0x461938)
+    ASM(ret)
+    ASM_END
 }
 
 typedef void(__cdecl* AudioCmdFn)(uint32_t, int, int, float, float, float);
@@ -224,10 +232,12 @@ static void __cdecl AudioCmd(uint32_t emitter, int cmd, int n, float a, float b,
     static uint32_t lastEmitter; static int lastCmd = -1, lastN; static float lastA, lastB, lastC;
     const bool same = cmd == lastCmd && (emitter & 0xFF) == lastEmitter && n == lastN && a == lastA && b == lastB && c == lastC;
     lastEmitter = emitter & 0xFF; lastCmd = cmd; lastN = n; lastA = a; lastB = b; lastC = c;
-    if (cmd != 1 && cmd != 9 && !same && g_lines < kMaxLines) {
+    const uintptr_t from = (uintptr_t)_ReturnAddress();
+    const bool script = from >= 0x45DB30 && from < 0x45E000;   // the level scripts' audio handlers
+    if (((cmd != 1 && cmd != 9) || script) && !same && g_lines < kMaxLines) {
         ++g_lines;
-        Log("audio: command %d emitter %d n %d (%.2f %.2f %.2f) from %08X", cmd, (int)(emitter & 0xFF), n, a, b, c,
-            (unsigned)(uintptr_t)_ReturnAddress());
+        Log("audio: command %d emitter %d n %d (%.2f %.2f %.2f) from %08X%s", cmd, (int)(emitter & 0xFF), n, a, b, c,
+            (unsigned)from, script ? " (level script)" : "");
     }
     GameFn((AudioCmdFn)&AudioCmdOrig)(emitter, cmd, n, a, b, c);
 }
@@ -271,11 +281,12 @@ static void WatchSubmixes()
     next = now + 500;
     float cur[16], target[16];
     uint32_t flags;
-    __try {
-        memcpy(cur, (const void*)0x561C04, sizeof cur);
-        memcpy(target, (const void*)0x561C44, sizeof target);
-        flags = *(const uint32_t*)0x561BF0;
-    } __except (EXCEPTION_EXECUTE_HANDLER) { return; }
+    if (!Guard([&] {
+            memcpy(cur, (const void*)0x561C04, sizeof cur);
+            memcpy(target, (const void*)0x561C44, sizeof target);
+            flags = *(const uint32_t*)0x561BF0;
+        }))
+        return;
     bool changed = first || flags != lastFlags;
     for (int i = 0; i < 16; ++i)
         if (cur[i] > lastCur[i] + 0.05f || cur[i] < lastCur[i] - 0.05f || target[i] != lastTarget[i]) changed = true;
@@ -381,14 +392,16 @@ static bool MoveSoundBanks()
     };
     static const uint32_t counts[] = { 0x4662A4 + 1, 0x4662B2 + 1, 0x4668D4 + 1, 0x4668E2 + 1 };   // mov ecx, 7
     // all or nothing: half of the instructions on the new arrays and half on the old ones would be worse than the bug
-    __try {
-        for (const auto& r : refs) if (*(const uint32_t*)r.at != r.old) { Log("sound banks: unexpected code at %08X", r.at); return false; }
-        for (uint32_t c : counts) if (*(const uint32_t*)c != 7) { Log("sound banks: unexpected code at %08X", c); return false; }
-        // the banks already loaded (the front end's) come along
-        memcpy(g_bank640, (const void*)0x99D640, 8 * 4);
-        memcpy(g_bank660, (const void*)0x99D660, 7 * 4);
-        memcpy(g_bank680, (const void*)0x99D680, 7 * 4);
-    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+    bool expected = true;
+    if (!Guard([&] {
+            for (const auto& r : refs) if (*(const uint32_t*)r.at != r.old) { Log("sound banks: unexpected code at %08X", r.at); expected = false; return; }
+            for (uint32_t c : counts) if (*(const uint32_t*)c != 7) { Log("sound banks: unexpected code at %08X", c); expected = false; return; }
+            // the banks already loaded (the front end's) come along
+            memcpy(g_bank640, (const void*)0x99D640, 8 * 4);
+            memcpy(g_bank660, (const void*)0x99D660, 7 * 4);
+            memcpy(g_bank680, (const void*)0x99D680, 7 * 4);
+        }) || !expected)
+        return false;
     for (int i = 7; i < 32; ++i) g_bank660[i] = 0xFFFFFFFF;   // what the clear writes
     bool ok = true;
     for (const auto& r : refs) {

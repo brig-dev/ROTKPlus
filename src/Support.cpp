@@ -1,6 +1,6 @@
 // Support.cpp - small hooks the other modules depend on: hero choice in the selection screen, script calls, ending
 // a level on demand
-// Language: C++17, MSVC, Win32.
+// Language: C++17, MSVC or mingw-w64 g++, Win32.
 #include "ROTKPlus.h"
 #include <stdio.h>
 #include <string.h>
@@ -32,14 +32,14 @@ static void __cdecl SetChoice2(int h)
 // 0x48ED90(type, x, code, args, result, ...) dispatches script calls. Outside the main per-frame update this is the
 // only regular place where the selection screen runs, so the deferred actions of Screens.cpp (ScreensFrame) are also
 // given a chance after every script call.
-static __declspec(naked) void ScriptCallOrig()   // mov edx,[esp+4]; sub esp,24h
+static NAKED void ScriptCallOrig()   // mov edx,[esp+4]; sub esp,24h
 {
-    __asm {
-        mov  edx, dword ptr [esp + 4]
-        sub  esp, 0x24
-        push 0x48ED97
-        ret
-    }
+    ASM_BEGIN
+    ASM(mov  edx, dword ptr [esp + 4])
+    ASM(sub  esp, 0x24)
+    ASM(push 0x48ED97)
+    ASM(ret)
+    ASM_END
 }
 
 static uint32_t __cdecl ScriptCall(int type, int x, uint32_t code, float* args, float* res, int a6, int a7)
@@ -60,21 +60,21 @@ static uint32_t __cdecl ScriptCall(int type, int x, uint32_t code, float* args, 
 static float g_endParam;
 static int   g_endMsg[8];
 
-static __declspec(naked) void __cdecl EndLevelNow(int* /*msg*/)
+static NAKED void __cdecl EndLevelNow(int* /*msg*/)
 {
-    __asm {
-        push ebp
-        mov  ebp, esp
-        and  esp, 0xFFFFFFF8
-        sub  esp, 0x0C
-        push ebx
-        push esi
-        mov  esi, dword ptr [ebp + 8]
-        xor  ebx, ebx
-        push edi
-        push 0x480B68
-        ret
-    }
+    ASM_BEGIN
+    ASM(push ebp)
+    ASM(mov  ebp, esp)
+    ASM(and  esp, 0xFFFFFFF8)
+    ASM(sub  esp, 0x0C)
+    ASM(push ebx)
+    ASM(push esi)
+    ASM(mov  esi, dword ptr [ebp + 8])
+    ASM(xor  ebx, ebx)
+    ASM(push edi)
+    ASM(push 0x480B68)
+    ASM(ret)
+    ASM_END
 }
 
 static bool g_victoryKey;
@@ -100,13 +100,10 @@ static void EndLevel(const char* why)
 extern uint32_t g_players[8];   // Coop.cpp
 static const char* const kStatNames[9] = { "Aragorn", "Legolas", "Gimli", "Gandalf", "Sam", "Frodo", "Pippin", "Merry", "Faramir" };
 
-// copies the record of a hero (a function of its own: __try cannot share a function with objects that need unwinding)
+// copies the record of a hero, false if it cannot be read
 static bool ReadRecord(int hero, uint32_t out[15])
 {
-    __try {
-        memcpy(out, (const void*)(0x5BE05C + hero * 0x3C), 15 * sizeof(uint32_t));
-        return true;
-    } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+    return Guard([&] { memcpy(out, (const void*)(0x5BE05C + hero * 0x3C), 15 * sizeof(uint32_t)); });
 }
 
 void LogStats(const char* when)
@@ -154,14 +151,14 @@ static void LogSnapshots()
         const uint32_t c = g_players[i];
         if (c != seen[i]) { seen[i] = c; down[i] = 0; changed = true; }
         if (!c) continue;
-        __try {
+        Guard([&] {
             const uint8_t d = *(const uint8_t*)(c + 0x810);
             if (d != down[i]) {
                 const float* p = (const float*)(c + 0x30);
                 Log("player %d: down flag %d -> %d at (%.1f, %.1f, %.1f)", i + 1, down[i], d, p[0], p[1], p[2]);
                 down[i] = d;
             }
-        } __except (EXCEPTION_EXECUTE_HANDLER) {}
+        });
     }
     if (changed) last = now;
     if (now - last < 60000) return;
@@ -169,10 +166,10 @@ static void LogSnapshots()
     char line[256]; int n = 0;
     for (int i = 0; i < 4; ++i) {
         if (!g_players[i]) continue;
-        __try {
+        Guard([&] {
             const float* p = (const float*)(g_players[i] + 0x30);
             n += sprintf_s(line + n, sizeof line - n, " P%d(%.0f,%.0f,%.0f)%s", i + 1, p[0], p[1], p[2], down[i] ? "*" : "");
-        } __except (EXCEPTION_EXECUTE_HANDLER) {}
+        });
     }
     if (!n) return;
     Log("snapshot:%s  (* = down)", line);

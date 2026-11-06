@@ -1,5 +1,5 @@
 // Icons.cpp - the portraits of the statistics pages, taken from the player's own game while it is played
-// Language: C++17, MSVC, Win32.
+// Language: C++17, MSVC or mingw-w64 g++, Win32.
 //
 // The statistics pages draw an icon in front of the heroes and the kinds of enemy (Players.cpp, IconTexture: the file
 // ROTKPlus_icons\<key>.raw in the game folder). ROTKPlus does not ship pictures of the game: the icons are made here,
@@ -257,7 +257,7 @@ void Look(void* tex)
 long __stdcall HookSetTexture(void* dev, unsigned long stage, void* tex)
 {
     if (tex && g_enabled && !g_allDone && g_seen.size() < 20000 && g_seen.insert(tex).second) {
-        __try { Look(tex); } __except (EXCEPTION_EXECUTE_HANDLER) {}
+        Guard([&] { Look(tex); });
         if (g_made) { g_made = 0; g_allDone = AllDone(); }
     }
     return g_realSetTex(dev, stage, tex);

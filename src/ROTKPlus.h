@@ -1,12 +1,15 @@
 // ROTKPlus.h - declarations shared by all modules
-// Language: C++17. Compiler: MSVC (Visual Studio 2022 or later), Win32 (x86).
+// Language: C++17. Compilers: MSVC (Visual Studio 2022 or later) and mingw-w64 g++ (i686), Win32 (x86).
 //
 // ROTKPlus is a mod for The Lord of the Rings: The Return of the King (PC, 2003): rotk.exe 1.0,
-// 1,703,936 bytes. It is loaded in place of DivxMediaLib.dll (the game's movie library, renamed
-// DivxMediaLib_orig.dll, to which every export is forwarded) and coexists with ROTK Fix / Athelas.
+// 1,703,936 bytes. It coexists with ROTK Fix / Athelas. One source, two builds:
+// - MSVC (src/ROTKPlus.vcxproj): DivxMediaLib.dll, loaded by the game in place of its movie library (renamed
+//   DivxMediaLib_orig.dll, to which every export is forwarded, Forward.cpp);
+// - g++ (build.sh, ROTKPLUS_MOD defined): ROTKPlus.dll, a mod of Athelas in ROTKFix\mods, started by ROTK Fix with
+//   ModInit (Main.cpp).
 #pragma once
 
-#if !defined(_M_IX86)
+#if !defined(_M_IX86) && !defined(__i386__)
 #error "ROTKPlus must be built for Win32 (x86): rotk.exe is a 32-bit program."
 #endif
 
@@ -15,7 +18,44 @@
 #include <stdint.h>
 #include <string>
 
-#define ROTKPLUS_VERSION "1.2.1"
+#define ROTKPLUS_VERSION "1.4.0"
+
+// --- one source for MSVC and g++ ----------------------------------------------------------------------------------
+// Inline assembly, Intel syntax, one instruction per ASM(...) line between ASM_BEGIN and ASM_END: MSVC reads every line
+// as an __asm statement, g++ the whole as one asm block. A C++ name the assembly uses (a variable, a function, another
+// naked function) is declared with ASM_NAME(name), which gives it that plain name for g++ and keeps it even if only the
+// assembly uses it (MSVC sees the C++ names directly); ASM_EXTERN(name) does the same for a declaration of something
+// defined in another file. Memory operands always say their size (dword ptr [name]), and labels start with the
+// function's name: for g++ they are visible to the whole file.
+#if defined(_MSC_VER)
+#define NAKED            __declspec(naked)
+#define ASM_BEGIN
+#define ASM(...)         __asm __VA_ARGS__
+#define ASM_END
+#define ASM_NAME(name)
+#define ASM_EXTERN(name)
+#else
+#include <intrin.h>
+#define NAKED            __attribute__((naked))
+#define ASM_TEXT(...)    #__VA_ARGS__
+#define ASM_BEGIN        __asm__(".intel_syntax noprefix\n"
+#define ASM(...)         ASM_TEXT(__VA_ARGS__) "\n"
+#define ASM_END          ".att_syntax prefix\n");
+#define ASM_NAME(name)   __asm__(#name) __attribute__((used))
+#define ASM_EXTERN(name) __asm__(#name)
+// MSVC's intrinsics, which mingw-w64's intrin.h only declares
+#define _ReturnAddress() __builtin_return_address(0)
+#define _AddressOfReturnAddress() ((void*)((char*)__builtin_frame_address(0) + sizeof(void*)))
+#endif
+
+// Guard(f) runs f() and returns false if it raised an exception instead (a character, a stream or a texture that is
+// gone): what __try/__except (EXCEPTION_EXECUTE_HANDLER) did, for both compilers (g++ has no __try). Guard.cpp.
+typedef void(__cdecl* GuardFn)(void*);
+extern "C" int __cdecl GuardedRun(GuardFn fn, void* ctx) ASM_EXTERN(GuardedRun);
+template <class F> inline bool Guard(const F& f)
+{
+    return GuardedRun([](void* p) { (*(const F*)p)(); }, (void*)&f) != 0;
+}
 
 // Call a naked trampoline (one that continues into the game's code) from C++: GameFn((type)&Trampoline)(...).
 // When it sees a static naked function in the same translation unit, MSVC may assume that it does not touch the
@@ -61,6 +101,7 @@ void IniWriteInt(const char* section, const char* key, int value);
 
 // --- Coop.cpp: third and fourth player ------------------------------------------------------------------------
 bool CoopInstall();
+extern volatile int g_spawningP3 ASM_EXTERN(g_spawningP3);   // 1 or 2 while the third or fourth player is handled
 int  HeroOfSlot(int slot);        // hero of an extra player (slot 2 = third, 3 = fourth) in the current level, -1 none
 
 // --- Pads.cpp: controllers of the third and fourth player (SDL3) -----------------------------------------------
@@ -85,8 +126,37 @@ bool Coop3Wanted();                           // at least 3 players
 bool Coop4Wanted();                           // 4 players
 void MenuIdleReset();                         // the main menu is in use: its demo timer starts again
 
+// --- the Multiplayer page's choice (Players.cpp hands it to Screens.cpp, which gives a versus game's to Pvp.cpp) ---
+struct MultiChoice {
+    int  players = 2;          // 2, 3 or 4 (4 in a 2 vs 2)
+    bool versus = false;       // a versus game (otherwise the campaign)
+    bool teams = false, enemies = true, timed = false;
+    int  lives = 2, minutes = 3, rounds = 1, team1 = 12;   // rounds 1, 3 or 5; team1 the two players of team 1 (12, 13, 14)
+};
+
+// --- Pvp.cpp: versus mode ------------------------------------------------------------------------------------------
+bool        PvpAllowed();                     // [PvP] Enabled
+bool        PvpActive();                      // a versus game was chosen (Co-op turns it off)
+void        PvpSetActive(bool on);            // confirmed Versus (on) or Co-op (off) in the main menu
+int         PvpChoicePlayers();               // players of the Versus entry's choice: 2, 3 or 4 (4 for 2 vs 2)
+void        PvpChoiceStep(int dir);           // left/right on the Versus entry: the next choice (+1) or the previous one
+std::string PvpChoiceLabel(const std::string& label);   // "Versus: 2 vs 2, heroes only" and the like
+void        PvpConfigure(const MultiChoice& m);   // the Multiplayer page's choice
+void        PvpOnPlayerHit(int attacker, int victim, bool down);   // Players.cpp: a player hit another one
+bool        PvpInGame();                      // a versus game is being played (Hud.cpp: the shared lives are hidden)
+bool        PvpHeroesOnlyGame();              // ... with the heroes only (Hud.cpp: the level's enemy bar is hidden too)
+int         PvpTeamOf(int slot);              // the team of a player in a 2 vs 2 (0 the Sun, 1 the Moon), -1 otherwise
+bool        PvpSkipScoreScreens();            // [PvP] SkipScoreScreens: after a versus game straight to the map
+bool        PvpLastGame();                    // [PvP] LastGame: after a versus game the Last game over the map
+bool        ScreensMapFilter(int& input);     // the map's input (Pvp.cpp, MapMove): false = swallowed (the recap is open)
+
 // --- Lang.cpp: texts in the game's language ---------------------------------------------------------------------
-// id: 0 Co-op menu entry, 1 Versus menu entry, 2 "{label}: {n} players", 3 "Player {n}", 4 winner, 5 draw
+// id: 0 Co-op menu entry, 1 Versus menu entry, 2 "{label}: {n} players", 3 "Player {n}", 4 winner, 5 draw,
+// 6 "{label}: 2 vs 2", 7 "{label}, heroes only", 8 "{label} wins" (a team's name), 9 "{label}: {hero}" (a team's name and
+// its players), 10 "{label} and {hero}", 11 and 12 the two teams' names (Sun, Moon), 13 "{label} downs {hero}",
+// 14 "{label} falls", 15 "{label} is out", 16 "Round {n}: {label} wins", 17 "Round {n}: draw", 18 "Round {n}",
+// 19 "{label} wins the Cup!", 20 "out", 21 "Time is up", 22 the same as 19 for a team ("The {label}..."), 23 "{label}
+// knocks out {hero}", 24 "1 life", 25 "{n} lives", 26 "1 point", 27 "{n} points"
 std::string LangText(int id, int n = 0, const char* hero = "", const char* label = "");
 
 std::string LangCode();                       // language of the mod's texts: "en", "it", ...
@@ -94,10 +164,28 @@ std::string LangGameText(const char* key);    // the game's own text for a key, 
 
 // --- Hud.cpp: HUD of the third and fourth player -----------------------------------------------------------------
 bool HudInstall(float dx, float dy, bool row, float rowScale);
+// Pads.cpp: a shoulder button (LB/LT -1, RB/RT +1) pressed on any open controller since the last call, 0 none; sdl = SDL
+// could be read (otherwise the game's input records are used)
+int  PadsShoulder(bool& sdl);
+void AudioNewLevel();                         // Audio.cpp: the audio log's lines count again from a level's start
 bool DrawHookInstall();                       // hook of the screen elements' drawing (0x4FD590), installed once
 void DrawGameElement(uint8_t* e);             // draws one screen element with the drawing origin at the top left
 bool HudTextTemplate(uint8_t* out);           // copies the HUD's text element (0xB0 bytes), false if not there
 void FastTextInstall(int mode);               // [General] FastText: texts drawn in one go (1 the mod's, 2 all, 0 off)
+// the versus game's texts (Pvp.cpp): the banner in the middle (its time starts when it is first drawn; with a cup), the
+// feed of knock-downs (at the bottom, above the boxes), in the gap between the top boxes the clock of a timed game, the
+// teams' totals (parts with a tone: 0 as it is, 1 gold, 2 pale blue, 3 dim) and the round of a tournament; in each
+// player's box its lives or points (in place of the game's kills, or after them: append); when the HUD was last drawn
+void  HudBanner(const char* text, DWORD ms);
+void  HudBannerCup(const char* text, DWORD ms);
+bool  HudBannerBusy();
+void  HudFeed(const char* text, int tone);
+void  HudFeedClear();
+void  HudStatus(int n, const char* const* texts, const int* tones);
+void  HudClock(const char* text);
+void  HudRound(const char* text);
+void  HudBoxText(int slot, const char* text, bool append, int tone = 0);
+DWORD HudDrawnAt();
 
 // --- Players.cpp: names of the players and their statistics ------------------------------------------------------
 void        PlayersInstall();
@@ -111,6 +199,11 @@ bool        PlayersMenuAction(int action, bool onEntry, int slot);   // menu act
 bool        PlayersAskWhoPlays();             // "Who is playing?" before every game ([Players] AskWhoPlays)
 bool        PlayersOpenLineup(int n);         // opens "Who is playing?" for n players (false = not shown)
 bool        PlayersLineupDone();              // Start was just confirmed (read once): run the entry's confirmation
+bool        PlayersMultiEnabled();            // the Co-op entry is "Multiplayer" with its page ([Players] MultiplayerPage)
+std::string PlayersMultiLabel();              // "Multiplayer" in the language of the pages
+bool        PlayersOpenMulti();               // opens the Multiplayer page (false = not shown)
+// after Start on the Multiplayer page: what to start (false = the page was not the Multiplayer one)
+bool        PlayersMultiChoice(MultiChoice& m);
 void        PlayersScriptCall(int id, uint32_t code, const float* args);   // Players.cpp: the trace of what the level does
 void        PlayersVictoryKey();                 // Players.cpp: F9 ended the level (not counted as completed)
 void        IconsFrame(bool newLevel);        // Icons.cpp: the portraits taken while playing
@@ -119,8 +212,22 @@ void        PlayersAfterDraw(uint32_t e);     // draws the page after the main m
 void        PlayersLevelStart(const char* level);   // a game level is being loaded ("min02")
 void        PlayersLevelLeave(bool won);      // the level is left (won = towards the score screen)
 void        PlayersOnFall(uint32_t c);        // a player enters the "die" state
-void        PlayersPvpEnd(int winner);        // a versus game is over: winner's slot, -1 draw
-void __cdecl PlayersGameKill(int index, uint32_t victim);   // HeroIndex.cpp: the game credits a kill (0x40D110)
+// a versus game is over: the winners' slots as bits (0 a draw), what kind of game it was and how it ended (the banner)
+struct PvpResult {
+    unsigned winners = 0;
+    bool teams = false, heroesOnly = false, timed = false;
+    int  lives = 0, minutes = 0, rounds = 1;
+    std::string text;            // "The Team of the Sun wins the Cup! (2 - 0)" and the like
+};
+void        PlayersPvpOver(const PvpResult& r);
+void        PlayersPvpRound(unsigned winners);   // a round of a tournament is over: its winners, as bits
+void        PlayersPvpElim(int attacker);        // a player eliminated an opponent (knocked down on the last life)
+void        PlayersOpenRecap();                  // after a versus game, on the map: the Last game with two buttons
+bool        PlayersRecapOpen();
+void        PlayersCloseRecap();
+int         PlayersRecapAction(int action, int slot);   // a menu action on it: 2 = it closed, the map
+void        PlayersDrawCup(float cx, float top, float h);   // a gold cup (the tournament's banner, Hud.cpp)
+void __cdecl PlayersGameKill(int index, uint32_t victim) ASM_EXTERN(PlayersGameKill);   // HeroIndex.cpp: the game credits a kill (0x40D110)
 std::string PlayersWinnerText(int slot, const char* hero);   // "Alex wins: Gandalf", "" if the player has no name
 void        PlayersPadOpened(int slot, const std::string& key);   // Pads.cpp: a controller opened for slot 2 or 3
 bool        PlayersHeadNames();               // names above the players' heads ([Players] HeadNames)

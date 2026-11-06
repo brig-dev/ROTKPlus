@@ -1,5 +1,5 @@
 // Sim.cpp - simulated controllers driven by the keyboard, for testing without controllers
-// Language: C++17, MSVC, Win32.
+// Language: C++17, MSVC or mingw-w64 g++, Win32.
 //
 // Enabled with [Debug] SimPads=1 in ROTKPlus.ini. It exists so that the co-op can be tried with a keyboard and mouse
 // only (no controller at all):
@@ -129,12 +129,12 @@ void SimFrame(bool (*hasPad)(int slot))
 }
 
 // replaces 0x49D480: "there are at least two controllers"
-static __declspec(naked) void TwoControllers()
+static NAKED void TwoControllers()
 {
-    __asm {
-        mov  al, 2
-        ret
-    }
+    ASM_BEGIN
+    ASM(mov  al, 2)
+    ASM(ret)
+    ASM_END
 }
 
 void SimInstall(bool on)

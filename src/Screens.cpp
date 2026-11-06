@@ -1,5 +1,5 @@
 // Screens.cpp - turns of the extra players in the end-of-level screens, hero selection, main menu entries
-// Language: C++17, MSVC, Win32.
+// Language: C++17, MSVC or mingw-w64 g++, Win32.
 //
 // The screens change with 0x47FA20(mode): previous (0x562AC4) = current (0x562AC0), current = new. After a victory in
 // co-op: the score screen (mode 2) twice, first for player 1 (previous 0) and then for player 2 (mode 2 is requested
@@ -80,7 +80,7 @@ static uint8_t* g_csScene;      // selection scene object (from 0x456210), valid
 // slot filter in the menu loop 0x4EAA60, recomputed every frame: kAnySlot = all,
 // kOnly | s = only slot s, kExcept2 = all but slots 2 and 3 (the extra players' pads)
 static const uint8_t kOnly = 0x80, kExcept2 = 0x20;
-static uint8_t g_menuSlot = kAnySlot;
+static uint8_t g_menuSlot ASM_NAME(g_menuSlot) = kAnySlot;
 static uint8_t* g_csLabel;          // element of player 1's label that was changed, nullptr = not changed
 static uint32_t g_csLabelOld;       // its original text (+0x8C)
 static uint8_t* g_csNumber;         // Player1Number that was changed
@@ -238,15 +238,15 @@ static void CharSelMarkScreen(uint8_t* scene)
 }
 
 // replaces 0x456210(scene, hero): state of the hero in the scene
-static __declspec(naked) void HeroStateOrig()   // push esi; mov esi,[esp+0Ch]; push edi
+static NAKED void HeroStateOrig()   // push esi; mov esi,[esp+0Ch]; push edi
 {
-    __asm {
-        push esi
-        mov  esi, dword ptr [esp + 0x0C]
-        push edi
-        push 0x456216
-        ret
-    }
+    ASM_BEGIN
+    ASM(push esi)
+    ASM(mov  esi, dword ptr [esp + 0x0C])
+    ASM(push edi)
+    ASM(push 0x456216)
+    ASM(ret)
+    ASM_END
 }
 
 static int __cdecl HeroState(uint8_t* scene, int hero)
@@ -299,30 +299,30 @@ static void UpdateMenuSlot()
 
 // at the start of every round of the menu loop 0x4EAA60 (0x4EAAA0, slot in bl): a slot excluded by the filter jumps
 // to the next round (0x4EB25A); otherwise the two original instructions and on to 0x4EAAAC
-static __declspec(naked) void MenuSlotStub()
+static NAKED void MenuSlotStub()
 {
-    __asm {
-        mov  al, byte ptr [g_menuSlot]
-        cmp  al, 0xFF
-        je   orig
-        test al, 0x80
-        jz   except
-        and  al, 0x0F
-        cmp  bl, al
-        je   orig
-        jmp  skip
-    except:
-        cmp  bl, 2                   // kExcept2: skip slots 2 and 3
-        jb   orig
-    skip:
-        push 0x4EB25A
-        ret
-    orig:
-        cmp  bl, byte ptr ds:[0x56DC75]
-        mov  byte ptr ds:[0x8E2111], bl
-        push 0x4EAAAC
-        ret
-    }
+    ASM_BEGIN
+    ASM(mov  al, byte ptr [g_menuSlot])
+    ASM(cmp  al, 0xFF)
+    ASM(je   MenuSlotStub_orig)
+    ASM(test al, 0x80)
+    ASM(jz   MenuSlotStub_except)
+    ASM(and  al, 0x0F)
+    ASM(cmp  bl, al)
+    ASM(je   MenuSlotStub_orig)
+    ASM(jmp  MenuSlotStub_skip)
+ASM(MenuSlotStub_except:)
+    ASM(cmp  bl, 2)                  // kExcept2: skip slots 2 and 3
+    ASM(jb   MenuSlotStub_orig)
+ASM(MenuSlotStub_skip:)
+    ASM(push 0x4EB25A)
+    ASM(ret)
+ASM(MenuSlotStub_orig:)
+    ASM(cmp  bl, byte ptr ds:[0x56DC75])
+    ASM(mov  byte ptr ds:[0x8E2111], bl)
+    ASM(push 0x4EAAAC)
+    ASM(ret)
+    ASM_END
 }
 
 // replaces 0x4EA200(slot): slot excluded from the menus (0x56DC75)
@@ -409,8 +409,8 @@ static const char* ElemName(uint32_t e)
 {
     if (!e) return "-";
     const char* n = nullptr;
-    __try { n = ((const char*(__cdecl*)(uint32_t))0x4ED810)(e); if (n && IsBadStringPtrA(n, 64)) n = nullptr; }
-    __except (EXCEPTION_EXECUTE_HANDLER) { n = nullptr; }
+    if (!Guard([&] { n = ((const char*(__cdecl*)(uint32_t))0x4ED810)(e); if (n && IsBadStringPtrA(n, 64)) n = nullptr; }))
+        n = nullptr;
     return n ? n : "?";
 }
 
@@ -452,6 +452,24 @@ void ScreensFrame()
         lastRoot = root;
     }
     UpdateMenuSlot();
+    // After a versus game straight to the map ([PvP] SkipScoreScreens): the score screen does not come through
+    // 0x47FA20 (SetMode below): the menus' own code writes the mode (0x4EA3A6, 0x4EA93B, 0x4EA9AA) after the end of the
+    // level (999). Tests of 04 and 05/11/2026: the screens came all the same. So when mode 2 appears right after a level
+    // the map is asked at once (the level is left as won first: the statistics and the Last game).
+    {
+        static int lastMode = -1;
+        const int m = *kMode;
+        if (m == MODE_SCORING && (lastMode == 0 || lastMode == 998 || lastMode == 999) && *kCoop == 1 && PvpActive() &&
+            PvpSkipScoreScreens()) {
+            PlayersLevelLeave(true);
+            EndTurn();
+            Log("pvp: versus game over, straight to the map (no score screens, the score screen came from mode %d)", lastMode);
+            RawSetMode(MODE_SCENESEL);
+            if (PvpLastGame()) PlayersOpenRecap();
+        }
+        lastMode = *kMode;
+    }
+    if (PlayersRecapOpen() && *kMode != MODE_SCENESEL) PlayersCloseRecap();   // (left the map some other way)
     PlayersFrame();
     AudioFrame();
     MainMenuFrame();
@@ -478,6 +496,21 @@ static void __cdecl SetMode(int m)
     }
     MenuDiagLeave(m);
     const int cur = *kMode, prev = *kPrevMode;
+    // After a versus game (04/11/2026): the game's screens after a victory (the score of each player, the co-op
+    // statistics, the shop of each player, the saving) have nothing to say about it (no rating; only the level's
+    // experience, 1000 for every hero, which a versus game should not give), and with four players they were ten. The
+    // level is left as towards the score screen (the statistics, the Last game) and the game goes straight to the map,
+    // as a level left from inside does ([PvP] SkipScoreScreens=0: the game's own screens).
+    // (the game itself writes the mode 999 at the end of a level and only then asks for the score screen: test of
+    // 04/11/2026, the screens came all the same)
+    if ((cur == 0 || cur == 998 || cur == 999) && m == MODE_SCORING && *kCoop == 1 && PvpActive() && PvpSkipScoreScreens()) {
+        PlayersLevelLeave(true);
+        EndTurn();
+        Log("pvp: versus game over, straight to the map (no score screens)");
+        RawSetMode(MODE_SCENESEL);
+        if (PvpLastGame()) PlayersOpenRecap();
+        return;
+    }
     // statistics of the players (Players.cpp): leaving a level towards the score screen (victory), the map, the hero
     // selection or the main menu. Other modes (e.g. a movie) do not end the level, nor does a loading: a level loaded
     // again directly is "Retry", still the same level (PlayersLevelStart).
@@ -544,14 +577,14 @@ static void __cdecl SetMode(int m)
 // 0x47FA20(3). Here, at the end of player 2's turn, the game's part that concerns player 2 is done (closing the window
 // 0x4F7920 and 0x47F9D0) and the third player's turn starts; the question comes at the end of the last extra player's
 // turn. Third -> fourth: only the window is closed (the extra players do not own a profile).
-static __declspec(naked) void ContinueOrig()   // mov eax,[8E57A0h]; add eax,-2
+static NAKED void ContinueOrig()   // mov eax,[8E57A0h]; add eax,-2
 {
-    __asm {
-        mov  eax, dword ptr ds:[0x8E57A0]
-        add  eax, -2
-        push 0x4F4118
-        ret
-    }
+    ASM_BEGIN
+    ASM(mov  eax, dword ptr ds:[0x8E57A0])
+    ASM(add  eax, -2)
+    ASM(push 0x4F4118)
+    ASM(ret)
+    ASM_END
 }
 
 static void __cdecl UpgradeContinue()
@@ -601,7 +634,8 @@ struct MenuItem {
 };
 static MenuItem g_coopItem = { "MainMenuScreen.Coop", nullptr, {}, {}, 0, 3 };
 static MenuItem g_pvpItem  = { "MainMenuScreen.Online", nullptr, {}, {}, 0, 2 };
-// "Players" (names and statistics, Players.cpp): the hidden PlayTrailer entry, made visible like Online
+// "Players" (names and statistics, Players.cpp): a hidden entry made visible, Online with the Multiplayer page (Versus is
+// not shown then), otherwise PlayTrailer (MainMenuFrame chooses)
 static MenuItem g_playersItem = { "MainMenuScreen.PlayTrailer", nullptr, {}, {}, 0, 0 };
 static int  g_wantN = 3;        // players of the game in progress (from the confirmed entry)
 
@@ -616,17 +650,19 @@ uint8_t* MenuTextTemplate(bool highlighted)
 int  CoopPlayers() { return g_cfg.coop ? g_wantN : 2; }
 bool Coop3Wanted() { return CoopPlayers() >= 3; }
 bool Coop4Wanted() { return CoopPlayers() >= 4; }
-void PvpSetActive(bool on);     // Pvp.cpp
-bool PvpAllowed();              // Pvp.cpp
-
 static void ShowChoice(MenuItem& m)
 {
     if (&m == &g_playersItem) {
         strncpy_s(m.shown, ("@" + PlayersMenuLabel()).c_str(), _TRUNCATE);
         return;
     }
+    if (&m == &g_coopItem && PlayersMultiEnabled()) {   // "Multiplayer": its page chooses the rest (Players.cpp)
+        strncpy_s(m.shown, ("@" + PlayersMultiLabel()).c_str(), _TRUNCATE);
+        return;
+    }
     const std::string label = LangText(&m == &g_coopItem ? 0 : 1);
-    const std::string text = "@" + LangText(2, m.players, "", label.c_str());
+    // Versus: also 2 vs 2 and the heroes only (Pvp.cpp)
+    const std::string text = "@" + (&m == &g_pvpItem ? PvpChoiceLabel(label) : LangText(2, m.players, "", label.c_str()));
     strncpy_s(m.shown, text.c_str(), _TRUNCATE);
 }
 
@@ -890,7 +926,7 @@ static void MenuDiagLeave(int m)
     const uint32_t* sp = (const uint32_t*)_AddressOfReturnAddress();
     for (int i = 0, found = 0; i < 256 && found < 12; ++i) {
         uint32_t v;
-        __try { v = sp[i]; } __except (EXCEPTION_EXECUTE_HANDLER) { break; }
+        if (!Guard([&] { v = sp[i]; })) break;
         if (v < 0x401005 || v >= 0x535000) continue;
         const uint8_t* r = (const uint8_t*)(uintptr_t)v;
         if (r[-5] == 0xE8 || (r[-6] == 0xFF && (r[-5] & 0x38) == 0x10) || (r[-2] == 0xFF && (r[-1] & 0x38) == 0x10)) {
@@ -913,7 +949,7 @@ static void MenuTimerFrame()
     if (table != g_watchTable) {   // a new front end: look for the elements again
         g_watchTable = table;
         g_nWatch = 0;
-        __try {
+        Guard([&] {
             const uint32_t size = *(const uint32_t*)(table + 4);
             for (uint32_t p = table + 8; p + 12 <= table + size && g_nWatch < 8; p += 12) {
                 const uint32_t name = *(const uint32_t*)p, e = *(const uint32_t*)(p + 8);
@@ -938,12 +974,12 @@ static void MenuTimerFrame()
                     MenuDiagLine(line);
                 }
             }
-        } __except (EXCEPTION_EXECUTE_HANDLER) {}
+        });
         if (!g_nWatch) MenuDiagLine("no element with \"attract\" in its name");
     }
     for (int w = 0; w < g_nWatch; ++w) {
         uint32_t cur[48];
-        __try { memcpy(cur, (const void*)(uintptr_t)g_watch[w].e, sizeof cur); } __except (EXCEPTION_EXECUTE_HANDLER) { continue; }
+        if (!Guard([&] { memcpy(cur, (const void*)(uintptr_t)g_watch[w].e, sizeof cur); })) continue;
         size_t n = 0;
         Append(line, sizeof line, n, "\"%.40s\" (page %s):", g_watch[w].name, PlayersPageOpen() ? "open" : "closed");
         const size_t head = n;
@@ -962,12 +998,12 @@ static void MenuTimerFrame()
 // take the menu's actions, so every action or key they use does the same.
 void MenuIdleReset()
 {
-    __try {
+    Guard([&] {
         uint8_t* e = FindElement("AttractTimer");
         if (!e) return;
         const float secs = *(const float*)(e + 0x78);
         if (secs > 1.0f && secs < 1000.0f && *(const uint32_t*)(e + 0x84) != 0) *(uint32_t*)(e + 0x80) = 0;
-    } __except (EXCEPTION_EXECUTE_HANDLER) {}
+    });
 }
 
 // The pointer over an entry of the main menu selects it. Test of 30/10/2026: with the Fellowship entry the pointer no
@@ -992,7 +1028,7 @@ void ScreensSawElement(uint32_t e)
     if (!e || *kMode != MODE_MAINMENU || PlayersPageOpen()) return;
     const uint32_t root = *(const uint32_t*)0x8E2F68;
     if (root != g_entryRoot) { g_entryRoot = root; g_nEntryPos = 0; }   // noted again at the next frame
-    __try {
+    Guard([&] {
         if (*(const uint16_t*)(uintptr_t)(e + 0x76) != 0x82 || !*(const uint16_t*)(uintptr_t)(e + 0x74)) return;
         const uint32_t parent = *(const uint32_t*)(uintptr_t)e;   // +0: the parent (as 0x4FDEE0 reads it)
         if (!parent || *(const uint16_t*)(uintptr_t)(parent + 0x76) != 10) return;
@@ -1004,7 +1040,7 @@ void ScreensSawElement(uint32_t e)
             ++g_nEntryPos;
         }
         g_entryPos[i] = EntryPos{ parent, x, y };
-    } __except (EXCEPTION_EXECUTE_HANDLER) {}
+    });
 }
 
 static void MenuHover()
@@ -1015,12 +1051,12 @@ static void MenuHover()
     if (!*(const uint8_t*)0x8E38BC || !*(const uint32_t*)0x8E38C4) return;
     if (*(const uint32_t*)0x8E2F68 != g_entryRoot) return;   // the entries noted belong to another front end
     float x = 0.0f, y = 0.0f;
-    __try { ((void(__cdecl*)(float*, float*))0x501800)(&x, &y); } __except (EXCEPTION_EXECUTE_HANDLER) { return; }
+    if (!Guard([&] { ((void(__cdecl*)(float*, float*))0x501800)(&x, &y); })) return;
     if (fabsf(x - lastX) < 0.002f && fabsf(y - lastY) < 0.002f) return;
     lastX = x; lastY = y;
     uint32_t over = 0;
     float overY = 0.0f;
-    __try {
+    if (!Guard([&] {
         // the visible entry whose row (from its label's top to a little below it) holds the pointer
         for (int i = 0; i < g_nEntryPos; ++i) {
             const EntryPos& p = g_entryPos[i];
@@ -1028,7 +1064,8 @@ static void MenuHover()
             if (y >= p.y - 0.01f && y < p.y + 0.06f && x >= p.x - 0.30f && x < p.x + 0.50f) { over = p.entry; overY = p.y; break; }
         }
         if (over && *(const uint32_t*)0x8E2F70 != over) *(uint32_t*)0x8E2F70 = over;
-    } __except (EXCEPTION_EXECUTE_HANDLER) { return; }
+    }))
+        return;
     if (over != lastOver && logged < 12) {
         ++logged;
         const char* name = over ? ((const char*(__cdecl*)(uint32_t))0x4ED810)(over) : nullptr;
@@ -1051,7 +1088,7 @@ static void MainMenuFrame()
         for (int i = 0; i < g_coopItem.n; ++i) *(const char**)(g_coopItem.texts[i] + 0x8C) = g_coopItem.shown;
     if (PlayersPageOpen()) { HideMenuEntries(); return; }
     ShowMenuEntries();
-    if (PvpAllowed()) {
+    if (PvpAllowed() && !PlayersMultiEnabled()) {   // (with the Multiplayer page the versus games start from there)
         uint8_t* before = g_pvpItem.elem;
         if (HookItem(g_pvpItem)) {
             *(uint16_t*)(g_pvpItem.elem + 0x74) = 1;
@@ -1064,6 +1101,9 @@ static void MainMenuFrame()
         }
     }
     if (PlayersEnabled()) {
+        // Fellowship takes the entry Versus leaves free with the Multiplayer page (Online, hidden by the game in every
+        // edition), so PlayTrailer, which the English edition shows, keeps its own trailer; otherwise PlayTrailer
+        g_playersItem.name = PlayersMultiEnabled() ? "MainMenuScreen.Online" : "MainMenuScreen.PlayTrailer";
         uint8_t* before = g_playersItem.elem;
         if (HookItem(g_playersItem)) {
             *(uint16_t*)(g_playersItem.elem + 0x74) = 1;
@@ -1072,19 +1112,20 @@ static void MainMenuFrame()
                 *(const char**)(g_playersItem.texts[i] + 0x8C) = g_playersItem.shown;
             }
             if (g_playersItem.elem != before) ((void(__cdecl*)(uint8_t*))0x4FC3A0)(g_playersItem.elem);   // enabled
-            MoveUnder(PvpAllowed() && g_pvpItem.elem ? g_pvpItem.elem : g_coopItem.elem, g_playersItem.elem);
+            MoveUnder(PvpAllowed() && !PlayersMultiEnabled() && g_pvpItem.elem ? g_pvpItem.elem : g_coopItem.elem,
+                      g_playersItem.elem);
         }
     }
     MenuHover();
 }
 
-static __declspec(naked) void MenuActionOrig()   // mov al,[8E2111h]
+static NAKED void MenuActionOrig()   // mov al,[8E2111h]
 {
-    __asm {
-        mov  al, byte ptr ds:[0x8E2111]
-        push 0x4EA0F5
-        ret
-    }
+    ASM_BEGIN
+    ASM(mov  al, byte ptr ds:[0x8E2111])
+    ASM(push 0x4EA0F5)
+    ASM(ret)
+    ASM_END
 }
 
 // "Who is playing?" (Players.cpp): the confirmation of Single, Co-op or Versus is held back while the page is open and
@@ -1092,7 +1133,7 @@ static __declspec(naked) void MenuActionOrig()   // mov al,[8E2111h]
 // ([0x8E2111], which 0x4EA0F0 copies to 0x56DC74 for the entry's script)
 static uint32_t g_pendSel;
 static uint8_t  g_pendSlot;
-static int      g_pendKind;     // 0 none, 1 Single, 2 Co-op, 3 Versus
+static int      g_pendKind;     // 0 none, 1 Single, 2 Co-op, 3 Versus, 4 Multiplayer (its page says which)
 
 static void ConfirmPending()
 {
@@ -1101,7 +1142,16 @@ static void ConfirmPending()
     if (!kind || *kMode != MODE_MAINMENU) return;
     ShowMenuEntries();   // as they were before the page
     uint32_t sel = g_pendSel;
-    if (kind >= 2) {
+    MultiChoice mc;
+    if (kind == 4 && PlayersMultiChoice(mc)) {
+        // the Co-op entry's own script in both cases; a versus game with the page's rules
+        g_wantN = mc.players;
+        if (!mc.versus) g_coopItem.players = mc.players;
+        if (mc.versus) PvpConfigure(mc);
+        PvpSetActive(mc.versus);
+        Log("main menu: confirmed Multiplayer, %s with %d players", mc.versus ? "a versus game" : "the campaign", mc.players);
+        if (g_coopItem.elem) sel = (uint32_t)(uintptr_t)g_coopItem.elem;
+    } else if (kind >= 2) {
         MenuItem& m = kind == 3 ? g_pvpItem : g_coopItem;
         g_wantN = m.players;
         PvpSetActive(kind == 3);
@@ -1129,6 +1179,19 @@ static void __cdecl MenuAction(int action)
         if (PlayersLineupDone()) ConfirmPending();
         return;
     }
+    if (*kMode == MODE_MAINMENU && sel && action == 7 && PlayersMultiEnabled() && g_coopItem.elem &&
+        sel == (uint32_t)(uintptr_t)g_coopItem.elem && *(const uint32_t*)(uintptr_t)(sel + 0x20) == 0) {
+        // Multiplayer: its page first; the extra players' controllers are looked for as with 4 players (their own
+        // places on the page), the real number comes with Start
+        g_wantN = 4;
+        if (PlayersOpenMulti()) {
+            g_pendSel = sel;
+            g_pendSlot = slot;
+            g_pendKind = 4;
+            Log("main menu: Multiplayer chosen (slot %u), its page first", slot);
+            return;
+        }
+    }
     if (*kMode == MODE_MAINMENU && sel && action == 7 && PlayersAskWhoPlays()) {
         uint8_t* single = FindElement("MainMenuScreen.Single");
         const bool isSingle = single && sel == (uint32_t)(uintptr_t)single;
@@ -1151,13 +1214,21 @@ static void __cdecl MenuAction(int action)
     if (*kMode == MODE_MAINMENU && sel) {
         MenuItem* m = sel == (uint32_t)(uintptr_t)g_coopItem.elem ? &g_coopItem
                     : sel == (uint32_t)(uintptr_t)g_pvpItem.elem ? &g_pvpItem : nullptr;
+        if (m == &g_coopItem && PlayersMultiEnabled() && (action == 4 || action == 5)) m = nullptr;   // Multiplayer: nothing to change on it
         if (m && (action == 4 || action == 5)) {   // right (4) adds a player, left (5) removes one: 2 -> 3 -> 4 and round again
+            if (m == &g_pvpItem) {   // Versus: 2, 3, 4, 2 vs 2, then the same with the heroes only (Pvp.cpp keeps it)
+                PvpChoiceStep(action == 4 ? 1 : -1);
+                m->players = PvpChoicePlayers();
+                ShowChoice(*m);
+                Log("main menu: Versus, %s", m->shown + 1);
+                return;
+            }
             m->players += action == 4 ? 1 : -1;
             if (m->players > 4) m->players = 2;
             if (m->players < 2) m->players = 4;
             ShowChoice(*m);
-            IniWriteInt(m == &g_coopItem ? "Coop" : "PvP", "Players", m->players);
-            Log("main menu: %s with %d players", m == &g_coopItem ? "Co-op" : "Versus", m->players);
+            IniWriteInt("Coop", "Players", m->players);
+            Log("main menu: Co-op with %d players", m->players);
             return;
         }
         if (m && action == 7) {   // confirm
@@ -1181,8 +1252,29 @@ static void __cdecl MenuAction(int action)
 // confirm within 250 ms of one from another slot, either of them from slot 3, is dropped, in every screen.
 static uintptr_t g_handler = 0x4EA0F0;   // the screen's own handler
 
+// The Last game over the map after a versus game: the map's keys do not come through the menus' actions (the menu
+// script passes the buttons as bits to 0x4F16A0, at 0x4F8391, Pvp.cpp's MapMove), so while it is open they are
+// swallowed there too and the map's cursor stays on the arena just played.
+static DWORD g_recapClosedAt;   // the key that closed it must not reach the map too (it would choose the arena)
+
+bool ScreensMapFilter(int& input)
+{
+    (void)input;
+    if (PlayersRecapOpen()) return false;
+    return !(g_recapClosedAt && (int)(GetTickCount() - g_recapClosedAt) < 500);
+}
+
 static void __cdecl ActionFilter(int action)
 {
+    // the Last game over the map after a versus game takes every action while it is open (confirm or back close it)
+    if (PlayersRecapOpen() && *kMode == MODE_SCENESEL) {
+        const uint8_t slot = *(const uint8_t*)0x8E2111;
+        // a mouse click is also a confirm of slot 0 a moment later (the button bound as a key): only the pointer's counts
+        if (action == 7 && slot == 0 && LeftJustPressed() && !(GetAsyncKeyState(VK_RETURN) & 0x8000) &&
+            !(GetAsyncKeyState(VK_SPACE) & 0x8000)) return;
+        if (PlayersRecapAction(action, slot) == 2) g_recapClosedAt = GetTickCount() | 1;
+        return;
+    }
     if (g_clickLog < ClickLogMax && (action == 7 || action == 8)) {
         ++g_clickLog;
         Log("click log: action %d slot %u (mode %d, selected %s, handler %08X, page %s)", action,
@@ -1250,10 +1342,10 @@ bool ScreensInstall()
     {
         auto clamp = [](int v) { return v < 2 ? 2 : v > 4 ? 4 : v; };
         g_coopItem.players = clamp(IniInt("Coop", "Players", 3));
-        g_pvpItem.players = clamp(IniInt("PvP", "Players", 2));
+        g_pvpItem.players = PvpChoicePlayers();
         g_wantN = g_coopItem.players;
-        Log("main menu: Co-op with %d players, Versus with %d (left/right on the entry)", g_coopItem.players,
-            g_pvpItem.players);
+        Log("main menu: Co-op with %d players, Versus with %d (left/right on the entry; teams and enemies in [PvP])",
+            g_coopItem.players, g_pvpItem.players);
         g_menuDiag = IniInt("Diag", "MenuTimerLog", 0) != 0;
         ClickLogMax = IniInt("Diag", "ClickLog", 0) != 0 ? 400 : 0;
         if (g_menuDiag) Log("main menu demo diagnostics: active ([Diag] MenuTimerLog=1)");

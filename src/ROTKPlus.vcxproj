@@ -11,6 +11,7 @@
     <ClCompile Include="Config.cpp" />
     <ClCompile Include="Coop.cpp" />
     <ClCompile Include="Forward.cpp" />
+    <ClCompile Include="Guard.cpp" />
     <ClCompile Include="HeroIndex.cpp" />
     <ClCompile Include="Icons.cpp" />
     <ClCompile Include="Hud.cpp" />

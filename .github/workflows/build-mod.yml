@@ -1,0 +1,29 @@
+# Builds the Athelas mod (ROTKPlus.dll) with build.sh on Ubuntu 24.04, with the same mingw-w64 g++ as Athelas' own
+# build (g++-mingw-w64-i686), so that a change that only MSVC or only a newer g++ accepts shows up here.
+name: build-mod
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mod:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install mingw-w64
+        run: sudo apt-get update && sudo apt-get install -y g++-mingw-w64-i686
+      - name: Build
+        run: |
+          i686-w64-mingw32-g++ --version | head -1
+          sh build.sh
+      - name: Check the DLL
+        run: |
+          i686-w64-mingw32-objdump -p ROTKPlus.dll | grep -E "DLL Name|DllCharacteristics"
+          i686-w64-mingw32-objdump -p ROTKPlus.dll | grep -E "\] +(ModInit|ROTKPlusLog)$"
+          sha256sum ROTKPlus.dll
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ROTKPlus-mod
+          path: ROTKPlus.dll

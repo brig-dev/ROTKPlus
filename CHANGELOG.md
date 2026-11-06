@@ -1,5 +1,94 @@
 # Changelog
 
+## 1.4.0
+
+Versus grows up: one Multiplayer page, teams of the Sun and the Moon, heroes only, timed games and tournaments, the
+Last game over the map; new fight statistics. It also brings 1.3.0, the Athelas mod build, which shipped inside
+Athelas 1.8.1 and was never released here on its own.
+
+- Versus: **knock-downs on the screen**. One message per event at the bottom of the screen, above the HUD boxes, for
+  three seconds ("Alex downs Robin", "Alex knocks out Robin" on the last life, "Robin falls" or "Robin is out" when
+  nobody did it). Every player's lives left, or the points of a timed game, are in their own HUD box in place of the
+  kills, with the heroes only; with the enemies after them, "17 kills, 2 lives" in the game's language. Between the two top boxes: the clock of a timed game, the two
+  teams' totals around it in their colours ("3  1:58  0", or "3 - 2" lives left) and the round of a tournament. (The
+  first version had a line of lives and the messages under the top boxes: they covered the names above the heads.)
+- Versus: the boxes of players down. An eliminated player's box is replaced by "out"; the third and fourth player's
+  boxes disappear during the respawn like player 2's, leaving the countdown (they showed player 1's or 2's
+  experience). The level's own extras are hidden: the co-op's shared lives (icon and number) and the allies' HUD at the
+  top right (a portrait in a ring with the ally's life, the Courtyard's "47/200"), which sat on the third player's box.
+- Versus: the banner in the middle is measured and centred (it began at a fixed point and long ones went out on the
+  right); a team's Cup is "The Team of the Sun wins the Cup!" where the language wants an article (`TeamCupWinner`).
+  The Cup is drawn with an outline, light and shade.
+- Versus, timed games: a player gets up after 5 seconds instead of 10 (`[PvP] TimedRespawn`); the countdown goes down
+  two a second. The log notes when the HUD is missing during a timed round (the clock stands still then).
+- Versus: after the winner's banner the map comes with the **Last game** over it (who won, each player's knock-downs
+  and falls); confirm or back closes it and the arena is chosen as usual (`[PvP] LastGame=0`: just the map).
+- Versus, timed games: **sudden death**. A round tied at the top when the time is up goes on, the clock at 0:00, until
+  a knock-down puts one side ahead (two minutes at most, then a draw; `[PvP] SuddenDeath=0`: a draw at once).
+- Statistics, Comparison's Versus tab: **who downed whom**, a row for each player shown ("Downed Alex") with how many
+  times each of the others did it; renaming, merging or deleting a name carries it along.
+- Versus with the heroes only at the Black Gate: its boss still comes for the opening scene (Frodo's mithril and its
+  lines; without it only the voice and the flying mithril were left) and goes away when the fight begins, before it
+  can strike (`[PvP] BossScene=0`: no boss at all). The boss's ring at the top right and the level's enemy bar are
+  hidden with the heroes only.
+- Versus: after the game straight to the map, without the game's score, co-op statistics, shop and save screens (ten
+  of them with four players; `[PvP] SkipScoreScreens=0` keeps them).
+- Statistics, Fights tab: **speed attacks** and **fierce attacks that hit** an opponent (an enemy, or another player in a
+  Versus game; one per swing, and not when a shield stops it), **shields broken** (by any attack: fierce, special, the
+  last blow of a combo) and **kicks** (the physical attack), landed / thrown.
+- The Last game of a Versus game: how it ended ("The Team of the Sun wins the Cup! (2 - 0)"), what kind of game it was,
+  the winners marked in gold, each player's team and, in a tournament, rounds won; "Most knock-downs" in place of
+  "Most kills".
+- The player's profile: a band with Versus games won of played, Cups and opponents knocked down.
+- The pages' shoulder buttons (another player in the statistics, the other box of the Multiplayer page) are read from
+  every controller: on SteamOS they did nothing in the menus.
+- `[Diag] AudioLog`: its 3000 lines are counted again for every level.
+- Versus: **tournaments** at the best of 3 or 5 rounds. A round won is a point; between two rounds the eliminated
+  players get up and those standing get their full life back; the first to win more than half takes the **Cup** (a
+  banner with a gold cup). A drawn round counts for nobody.
+- Versus: **timed** games (2, 3 or 5 minutes): no lives, every knock-down of an opponent is a point, the most points
+  win (by player, or by team). The clock runs only while the HUD is on the screen.
+- Statistics, Versus tab: opponents eliminated, rounds played and won (in tournaments: a single
+  game is not counted as a round), tournaments played, cups won, team games and timed games won, the most knock-downs
+  in a timed game.
+- **Multiplayer**: one main menu entry in place of Co-op and Versus. Its page chooses, on the left, the mode (campaign,
+  everybody against everybody, teams), the players, the enemies, the lives and the teams, and on the right who plays;
+  Start goes on to the map. Up/down stay in one box and go on to Start and Back, the shoulder buttons (or Tab, Page Up,
+  Page Down) go to the other box, confirm starts from any row. Fellowship moves to the entry Versus leaves free, so the
+  English edition keeps its Play Trailer entry. `[Players] MultiplayerPage=0` gives back the two entries.
+- 2 vs 2: the teams are the Sun's (gold) and the Moon's (silver-blue), also in the banners (`TeamSun`, `TeamMoon` in
+  `ROTKPlus.lang.ini`).
+- The menu's glint (the star on the selected entry) is hidden while a page of the mod is open (it stayed over the
+  page where the menu's entry was) and comes back on the menu when the page closes.
+- The pages' help line: each key in a dark box with a gold edge, then what it does; up/down and left/right as arrows;
+  confirm and back are no longer listed.
+- The pages' labels, headings and help lines are really dimmer than the entries, as they were meant to be (the
+  colour of the menu's label is above the font's own, so the dimming never showed).
+- The banners in the middle of the screen (teams, winner) wait for the HUD: the teams' banner used to run out during the
+  level's opening cutscene.
+- Versus: **2 vs 2** (players 1 and 2 against 3 and 4, `[PvP] Team1` for other pairs): teammates cannot hit each other
+  with any attack, the teams are shown at the start, the last team standing wins (both players get the win in the
+  statistics).
+- Versus: **heroes only**. The characters of the enemy side are not created, neither those placed in the level nor
+  those of its spawners; the allies are. Chosen on the Versus entry like the number of players
+  (`[PvP] Enemies`).
+- Versus: the map offers only three arenas, the Southern Gate, the Courtyard of Minas Tirith and the Black Gate, open
+  even if not unlocked yet; the cursor jumps from one to the next (`[PvP] ArenasOnly=0` for every level).
+- Versus, experimental: a sound of the level when a player hits another one and a music at the start
+  (`[PvP] Cheer_<level>`, `Music_<level>`: audio commands taken from the log, several joined by '+'). The Black Gate has
+  its crowd built in: the soldiers around the arena cheer as they do when Aragorn hits its boss. `[Diag] AudioLog=1` now also writes the
+  sounds the level scripts play, to find them.
+
+## 1.3.0 (the Athelas mod build, in Athelas 1.8.1)
+
+- ROTKPlus can also be a mod of Athelas: `build.sh` builds `ROTKPlus.dll` with mingw-w64 g++ for `ROTKFix\mods`
+  (turned on in the launcher's Mods tab, started by ROTK Fix), from the same sources as `DivxMediaLib.dll`, which is
+  still built with MSVC. Settings, statistics and logs stay in the game folder. With both installed only one changes
+  the game, and the log says which.
+- The log says how ROTKPlus was started (`started as the ...`) and whether `ROTKFix\mods\ROTKPlus.dll` is there.
+- README: the game loads `DivxMediaLib.dll` as soon as it starts, not at the first movie (ROTK Fix's
+  `SkipOpeningLogos` does not matter for it).
+
 ## 1.2.1
 
 - Fixed: on the Fellowship pages Enter sometimes did nothing, or acted on the place under the mouse pointer instead of

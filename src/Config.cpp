@@ -1,5 +1,5 @@
 // Config.cpp - reads ROTKPlus.ini (in the game folder)
-// Language: C++17, MSVC, Win32.
+// Language: C++17, MSVC or mingw-w64 g++, Win32.
 #include "ROTKPlus.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,7 +39,13 @@ static void IniString(const char* key, const char* def, char* out, size_t n)
 void LoadConfig()
 {
     char buf[64];
-    g_cfg.coop = IniInt("Coop", "Enabled", 0) != 0;
+#if defined(ROTKPLUS_MOD)
+    // as a mod of Athelas ROTKPlus is turned on and off in the launcher's Mods tab: without a ROTKPlus.ini it is on
+    const int coopDefault = 1;
+#else
+    const int coopDefault = 0;   // the DivxMediaLib.dll install: off without a ROTKPlus.ini (README, Installation)
+#endif
+    g_cfg.coop = IniInt("Coop", "Enabled", coopDefault) != 0;
     IniString("Hero", "auto", buf, sizeof buf);
     for (char* p = buf; *p; ++p) *p = (char)tolower((unsigned char)*p);
     g_cfg.hero3 = -1;

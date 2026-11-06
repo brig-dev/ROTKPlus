@@ -1,5 +1,5 @@
 // Coop.cpp - third and fourth player in co-op
-// Language: C++17, MSVC, Win32.
+// Language: C++17, MSVC or mingw-w64 g++, Win32.
 //
 // How players come to life in rotk.exe (all addresses are for `rotk.exe` 1.0):
 //  - the level loader (0x4BE870) puts the packages to load in a list, among them Data/Player/char_xxx.scw for
@@ -82,16 +82,16 @@ static int __cdecl Hero2()
 
 // --- character index in 0x442ED0: replaces "mov dword [esi+690h], 1" ---
 // 1 for player 2, 2 for the third player (g_spawningP3 = 1), 3 for the fourth (g_spawningP3 = 2)
-static __declspec(naked) void IndexStub()
+static NAKED void IndexStub()
 {
-    __asm {
-        push eax
-        mov  eax, dword ptr [g_spawningP3]
-        inc  eax
-        mov  dword ptr [esi + 0x690], eax
-        pop  eax
-        ret
-    }
+    ASM_BEGIN
+    ASM(push eax)
+    ASM(mov  eax, dword ptr [g_spawningP3])
+    ASM(inc  eax)
+    ASM(mov  dword ptr [esi + 0x690], eax)
+    ASM(pop  eax)
+    ASM(ret)
+    ASM_END
 }
 
 // --- level allies: a hero chosen by an extra player is not also an ally ---------------------------
@@ -122,15 +122,15 @@ static int __cdecl AllyFor3(int level, int n, int hero1, int hero2, int coop)
 // 0x4F6E90(1)). With two players you can therefore die twice in total. Here: one more life per extra player
 // (g_livesExtra, added to the write at 0x4432CB even if player 1 is created after the others) and, at death, "the
 // other" is any teammate still alive among the four (OtherForDeath at 0x434DB9).
-static int g_livesExtra;   // extra lives in the current level (1 per extra player)
+static int g_livesExtra ASM_NAME(g_livesExtra);   // extra lives in the current level (1 per extra player)
 
-static __declspec(naked) void LivesInitStub()   // replaces "mov [579B28h], edx" at 0x4432CB (6 bytes)
+static NAKED void LivesInitStub()   // replaces "mov [579B28h], edx" at 0x4432CB (6 bytes)
 {
-    __asm {
-        add  edx, dword ptr [g_livesExtra]
-        mov  dword ptr ds:[0x579B28], edx
-        ret
-    }
+    ASM_BEGIN
+    ASM(add  edx, dword ptr [g_livesExtra])
+    ASM(mov  dword ptr ds:[0x579B28], edx)
+    ASM(ret)
+    ASM_END
 }
 
 static int CharState(uint32_t c)
@@ -179,6 +179,7 @@ static int __cdecl LoadPackages(PackageList* list)
 {
     g_hero[2] = g_hero[3] = -1;
     HudNewLevel();
+    AudioNewLevel();
     // game levels only: the list contains the char_ packages of the two players (the menu, which is also a level
     // loaded this way, does not: Gimli once ended up in it when returning to the menu after co-op)
     int chars = 0;
@@ -240,6 +241,9 @@ static void LogPos(const char* who, uint32_t c)
 }
 
 // k = 1: the third player (slot 2), k = 2: the fourth (slot 3)
+static int __cdecl BeginSpawn(int k) ASM_NAME(BeginSpawn);
+static void __cdecl EndSpawn(int k) ASM_NAME(EndSpawn);
+
 static int __cdecl BeginSpawn(int k)
 {
     if (g_hero[k + 1] < 0) return 0;
@@ -271,13 +275,16 @@ static void __cdecl EndSpawn(int k)
         Log("co-op: message keys %d %d %d", g_players[0] ? *(int*)(g_players[0] + 0x74) : -1,
             *(int*)(g_players[1] + 0x74), *keyN);
         int maxKey = 0, same = 0;
-        __try {
-            for (uint8_t* e = *(uint8_t**)0x579188; e; e = *(uint8_t**)(e + 0x60)) {
-                const int key = *(int*)(e + 0x74);
-                if (key > maxKey) maxKey = key;
-                if (key == *keyN && (uint32_t)(uintptr_t)e != g_players[slot]) ++same;
-            }
-        } __except (EXCEPTION_EXECUTE_HANDLER) { Log("co-op: entity list unreadable"); same = 0; }
+        if (!Guard([&] {
+                for (uint8_t* e = *(uint8_t**)0x579188; e; e = *(uint8_t**)(e + 0x60)) {
+                    const int key = *(int*)(e + 0x74);
+                    if (key > maxKey) maxKey = key;
+                    if (key == *keyN && (uint32_t)(uintptr_t)e != g_players[slot]) ++same;
+                }
+            })) {
+            Log("co-op: entity list unreadable");
+            same = 0;
+        }
         if (same) { *keyN = maxKey + 1; Log("co-op: key of player %d shared with %d entities, changed to %d", slot + 1, same, *keyN); }
     }
     // Zero the extra player's per-level statistics: the game does it for players 1 and 2 when a level starts, not for
@@ -304,41 +311,41 @@ static void __cdecl EndSpawn(int k)
 }
 
 // replaces "call 0x492AC0" at 0x492B87 ("push 2" already done, ebx = start entity)
-static __declspec(naked) void SpawnP2Stub()
+static NAKED void SpawnP2Stub()
 {
-    __asm {
-        push dword ptr [esp + 4]
-        mov  eax, kSpawnPlayer
-        call eax
-        add  esp, 4
-        push 1
-        call BeginSpawn
-        add  esp, 4
-        test eax, eax
-        jz   done3
-        push 2
-        mov  eax, kSpawnPlayer
-        call eax
-        add  esp, 4
-        push 1
-        call EndSpawn
-        add  esp, 4
-    done3:
-        push 2
-        call BeginSpawn
-        add  esp, 4
-        test eax, eax
-        jz   done
-        push 2
-        mov  eax, kSpawnPlayer
-        call eax
-        add  esp, 4
-        push 2
-        call EndSpawn
-        add  esp, 4
-    done:
-        ret
-    }
+    ASM_BEGIN
+    ASM(push dword ptr [esp + 4])
+    ASM(mov  eax, 0x492AC0)            // kSpawnPlayer
+    ASM(call eax)
+    ASM(add  esp, 4)
+    ASM(push 1)
+    ASM(call BeginSpawn)
+    ASM(add  esp, 4)
+    ASM(test eax, eax)
+    ASM(jz   SpawnP2Stub_done3)
+    ASM(push 2)
+    ASM(mov  eax, 0x492AC0)
+    ASM(call eax)
+    ASM(add  esp, 4)
+    ASM(push 1)
+    ASM(call EndSpawn)
+    ASM(add  esp, 4)
+ASM(SpawnP2Stub_done3:)
+    ASM(push 2)
+    ASM(call BeginSpawn)
+    ASM(add  esp, 4)
+    ASM(test eax, eax)
+    ASM(jz   SpawnP2Stub_done)
+    ASM(push 2)
+    ASM(mov  eax, 0x492AC0)
+    ASM(call eax)
+    ASM(add  esp, 4)
+    ASM(push 2)
+    ASM(call EndSpawn)
+    ASM(add  esp, 4)
+ASM(SpawnP2Stub_done:)
+    ASM(ret)
+    ASM_END
 }
 
 // --- controls of the extra players -------------------------------------------------
@@ -425,6 +432,8 @@ static void RecallStragglers();
 
 static bool g_camera = true;   // [Coop] Camera: 0 = the game's own framing of players 1 and 2 (to compare, e.g. the music)
 
+static void __cdecl AdjustCameraFocus() ASM_NAME(AdjustCameraFocus);
+
 static void __cdecl AdjustCameraFocus()
 {
     if (!g_players[2] || !g_camera) return;
@@ -458,15 +467,15 @@ static void __cdecl AdjustCameraFocus()
 }
 
 // replaces "call 0x46F530" at 0x46FBBA: registers left intact for 0x46F530
-static __declspec(naked) void FramePairStub()
+static NAKED void FramePairStub()
 {
-    __asm {
-        pushad
-        call AdjustCameraFocus
-        popad
-        push kFramePair
-        ret
-    }
+    ASM_BEGIN
+    ASM(pushad)
+    ASM(call AdjustCameraFocus)
+    ASM(popad)
+    ASM(push 0x46F530)                 // kFramePair
+    ASM(ret)
+    ASM_END
 }
 
 // --- bringing back whoever is stuck outside the camera frame -----------------------------
@@ -528,61 +537,62 @@ static void RecallStragglers()
 // completed for player 1's hero and, in co-op, repeats the same sequence for player 2 (0x480C3D..0x480C70: 0x47EF80,
 // 0x47F300, 0x481710, 0x47EF80, 0x480140, 0x47F300, 0x47EF80, 0x47F590). The last call (0x47F590 at 0x480C6B) is
 // hooked and the identical sequence is repeated for each extra player, with 0x47EF80 answering that player's hero.
-static uint32_t g_creditRet;
-static int g_creditSlot;
+static uint32_t g_creditRet ASM_NAME(g_creditRet);
+static int g_creditSlot ASM_NAME(g_creditSlot);
 
 // k = 1 (third) or 2 (fourth): 1 if the player is in the level
+static int __cdecl ExtraInLevel(int k) ASM_NAME(ExtraInLevel);
 static int __cdecl ExtraInLevel(int k) { return g_hero[k + 1] >= 0 && g_players[k + 1] != 0; }
 
-static __declspec(naked) void CreditExtraStub()
+static NAKED void CreditExtraStub()
 {
-    __asm {
-        pop  ecx
-        mov  g_creditRet, ecx
-        mov  eax, 0x47F590
-        call eax                      // the original call, with its arguments on the stack
-        mov  g_creditSlot, 1
-    next:
-        push g_creditSlot
-        call ExtraInLevel
-        add  esp, 4
-        test eax, eax
-        jz   skip
-        mov  eax, g_creditSlot
-        mov  g_spawningP3, eax
-        push 1
-        mov  eax, 0x47EF80
-        call eax
-        push eax
-        mov  eax, 0x47F300
-        call eax
-        push eax
-        mov  eax, 0x481710
-        call eax
-        mov  eax, 0x47EF80
-        call eax
-        push eax
-        mov  eax, 0x480140
-        call eax
-        add  esp, 0x10
-        push eax
-        mov  eax, 0x47F300
-        call eax
-        push eax
-        mov  eax, 0x47EF80
-        call eax
-        push eax
-        mov  eax, 0x47F590
-        call eax
-        add  esp, 0x0C
-        mov  g_spawningP3, 0
-    skip:
-        inc  g_creditSlot
-        cmp  g_creditSlot, 2
-        jle  next
-        push g_creditRet
-        ret
-    }
+    ASM_BEGIN
+    ASM(pop  ecx)
+    ASM(mov  dword ptr [g_creditRet], ecx)
+    ASM(mov  eax, 0x47F590)
+    ASM(call eax)                    // the original call, with its arguments on the stack
+    ASM(mov  dword ptr [g_creditSlot], 1)
+ASM(CreditExtraStub_next:)
+    ASM(push dword ptr [g_creditSlot])
+    ASM(call ExtraInLevel)
+    ASM(add  esp, 4)
+    ASM(test eax, eax)
+    ASM(jz   CreditExtraStub_skip)
+    ASM(mov  eax, dword ptr [g_creditSlot])
+    ASM(mov  dword ptr [g_spawningP3], eax)
+    ASM(push 1)
+    ASM(mov  eax, 0x47EF80)
+    ASM(call eax)
+    ASM(push eax)
+    ASM(mov  eax, 0x47F300)
+    ASM(call eax)
+    ASM(push eax)
+    ASM(mov  eax, 0x481710)
+    ASM(call eax)
+    ASM(mov  eax, 0x47EF80)
+    ASM(call eax)
+    ASM(push eax)
+    ASM(mov  eax, 0x480140)
+    ASM(call eax)
+    ASM(add  esp, 0x10)
+    ASM(push eax)
+    ASM(mov  eax, 0x47F300)
+    ASM(call eax)
+    ASM(push eax)
+    ASM(mov  eax, 0x47EF80)
+    ASM(call eax)
+    ASM(push eax)
+    ASM(mov  eax, 0x47F590)
+    ASM(call eax)
+    ASM(add  esp, 0x0C)
+    ASM(mov  dword ptr [g_spawningP3], 0)
+ASM(CreditExtraStub_skip:)
+    ASM(inc  dword ptr [g_creditSlot])
+    ASM(cmp  dword ptr [g_creditSlot], 2)
+    ASM(jle  CreditExtraStub_next)
+    ASM(push dword ptr [g_creditRet])
+    ASM(ret)
+    ASM_END
 }
 
 // --- installation ----------------------------------------------------------------

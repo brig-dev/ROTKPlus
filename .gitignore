@@ -16,3 +16,5 @@ Debug/
 *.exe
 *.scw
 ROTKPlus.log
+# the Athelas mod built by build.sh
+/ROTKPlus.dll

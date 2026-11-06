@@ -1,0 +1,2 @@
+# build.sh runs on Linux (and in Git Bash): always LF
+*.sh text eol=lf

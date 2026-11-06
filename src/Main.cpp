@@ -1,14 +1,17 @@
-// Main.cpp - DLL entry point, log, and the functions that modify the game's code
-// Language: C++17, MSVC, Win32.
+// Main.cpp - entry points (the proxy's DllMain, the Athelas mod's ModInit), log, and the functions that modify the
+// game's code
+// Language: C++17, MSVC or mingw-w64 g++, Win32.
 #include "ROTKPlus.h"
 #include <stdio.h>
 #include <stdarg.h>
+#include <stdlib.h>
 #include <string.h>
 #include <string>
 #include <vector>
 #include <algorithm>
 
-static char             g_dir[MAX_PATH];
+static char             g_dir[MAX_PATH];   // the game folder: settings, statistics and logs (for the mod too)
+static HMODULE          g_self;
 static CRITICAL_SECTION g_logCs;
 static FILE*            g_log;        // this session's own file: ROTKPlus_logs\ROTKPlus_<date>_<time>.log
 static char             g_logStamp[40];   // its <date>_<time>[_n], for the copy of ROTK Fix's log at the end
@@ -152,7 +155,8 @@ static void LogSessionHeader()
     else      Log("system: Windows %s (version %lu.%lu build %lu), %lu logical CPUs",
                   os.dwBuildNumber >= 22000 ? "11" : os.dwMajorVersion >= 10 ? "10" : "older than 10",
                   os.dwMajorVersion, os.dwMinorVersion, os.dwBuildNumber, si.dwNumberOfProcessors);
-    for (const char* name : { "ROTKFix.dll", "SDL3.dll", "d3d8.dll", "dinput8.dll", "DivxMediaLib_orig.dll" }) {
+    for (const char* name : { "ROTKFix.dll", "SDL3.dll", "d3d8.dll", "dinput8.dll", "DivxMediaLib_orig.dll",
+                              "ROTKFix\\mods\\ROTKPlus.dll" }) {
         char p[MAX_PATH]; sprintf_s(p, "%s\\%s", g_dir, name);
         WIN32_FILE_ATTRIBUTE_DATA a;
         if (GetFileAttributesExA(p, GetFileExInfoStandard, &a)) {
@@ -240,7 +244,7 @@ static LONG CALLBACK CrashLogger(EXCEPTION_POINTERS* ep)
                        (LPCSTR)(uintptr_t)c->Eip, &at);
     const bool inGame = c->Eip >= 0x401000 && c->Eip < 0x535000;
     if (!inGame && at != self) return EXCEPTION_CONTINUE_SEARCH;
-    // A vectored handler runs before the __try blocks: an access violation that ROTKPlus itself expects and handles
+    // A vectored handler runs before the Guard blocks: an access violation that ROTKPlus itself expects and handles
     // (reading a character or a stream that may be gone) also arrives here. So only the first three are written, the
     // line about ROTKPlus included (it used to be written every time, before the count).
     static LONG once;
@@ -256,7 +260,7 @@ static LONG CALLBACK CrashLogger(EXCEPTION_POINTERS* ep)
     const uint32_t* sp = (const uint32_t*)c->Esp;
     for (int i = 0, found = 0; i < 512 && found < 16; ++i) {
         uint32_t v;
-        __try { v = sp[i]; } __except (EXCEPTION_EXECUTE_HANDLER) { break; }
+        if (!Guard([&] { v = sp[i]; })) break;
         if (v < 0x401005 || v >= 0x535000) continue;
         const uint8_t* r = (const uint8_t*)v;
         if (r[-5] == 0xE8 || (r[-6] == 0xFF && (r[-5] & 0x38) == 0x10) || (r[-2] == 0xFF && (r[-1] & 0x38) == 0x10)) {
@@ -273,6 +277,64 @@ void SupportInstall(bool victoryKey);   // Support.cpp
 void AudioInstall(bool on);       // Audio.cpp
 void AudioBanksInstall(bool on);  // Audio.cpp
 
+// --- how this copy was started, and which copy changes the game -------------------------------------------------------
+// The proxy (DivxMediaLib.dll, the MSVC build) starts when rotk.exe loads it, at the very start of the game, a few
+// milliseconds after ROTK Fix. The Athelas mod (ROTKFix\mods\ROTKPlus.dll, the g++ build) starts when ROTK Fix calls
+// its ModInit, the first time the game calls Direct3DCreate8, some 60 ms later: the game has only opened its window by
+// then, with no menu, level, sound or Direct3D device yet, so every patch below is still in time, and what needs the
+// game's objects already waits for them in the per-frame hook (Pads.cpp, 0x4ABE67, on the game's thread: ROTK Fix's
+// own frame hooks would run only with DXVK). With both installed only the first one to start changes the game: it
+// leaves a note in the game process' environment (ROTKPLUS_ACTIVE = process id|its file|what it is); a copy that finds
+// the note writes a line in the first one's log (through its export ROTKPlusLog) and in ROTK Fix's, and does nothing
+// else (no log of its own: it would empty ROTKPlus.log). A proxy from before the note (1.2.1 or older) is recognised by
+// the game's original movie library, loaded next to it.
+#if defined(ROTKPLUS_MOD)
+static const char kKind[] = "Athelas mod";
+#else
+static const char kKind[] = "DivxMediaLib.dll proxy";
+#endif
+static const char kActiveVar[] = "ROTKPLUS_ACTIVE";
+static bool g_active;   // this copy changes the game
+
+extern "C" __declspec(dllexport) void __cdecl ROTKPlusLog(const char* text)
+{
+    if (g_active && text) Log("%s", text);
+}
+
+// a line in ROTK Fix's log (ROTKFix.log), if ROTK Fix is there
+static void RotkFixLog(const char* text)
+{
+    HMODULE fix = GetModuleHandleA("ROTKFix.dll");
+    typedef void(__cdecl* RfLog)(const char*, ...);
+    RfLog log = fix ? (RfLog)(void*)GetProcAddress(fix, "RF_Log") : nullptr;
+    if (log) log("%s", text);
+}
+
+// another copy of ROTKPlus already at work in this game: its file (may be empty) and what it is
+static bool OtherCopy(char* file, size_t fileSize, char* what, size_t whatSize)
+{
+    char v[MAX_PATH + 128];
+    const DWORD len = GetEnvironmentVariableA(kActiveVar, v, sizeof v);
+    char* rest = nullptr;
+    if (len && len < sizeof v && strtoul(v, &rest, 10) == GetCurrentProcessId() && rest && *rest == '|') {
+        char* bar = strchr(rest + 1, '|');
+        if (bar) {
+            *bar = 0;
+            strncpy_s(file, fileSize, rest + 1, _TRUNCATE);
+            strncpy_s(what, whatSize, bar + 1, _TRUNCATE);
+            return true;
+        }
+    }
+#if defined(ROTKPLUS_MOD)
+    if (GetModuleHandleA("DivxMediaLib_orig.dll")) {
+        file[0] = 0;
+        strncpy_s(what, whatSize, "a DivxMediaLib.dll proxy (ROTKPlus 1.2.1 or older)", _TRUNCATE);
+        return true;
+    }
+#endif
+    return false;
+}
+
 static void Start()
 {
     g_startTick = GetTickCount();
@@ -282,6 +344,9 @@ static void Start()
     DeleteOldLogs(IniInt("Log", "Keep", 0), "ROTKFix");
     Log("ROTKPlus %s", ROTKPLUS_VERSION);
     Log("game folder: %s", g_dir);
+    char self[MAX_PATH] = "";
+    GetModuleFileNameA(g_self, self, MAX_PATH);
+    Log("started as the %s: %s", kKind, self);
     LogSessionHeader();
     Log("log: detail %d, keep %d session files (0 = all)", g_detail, IniInt("Log", "Keep", 0));
     BackupStats(IniInt("Log", "StatsBackups", 10));
@@ -303,16 +368,59 @@ static void Start()
     PvpInstall();
 }
 
+// the first copy changes the game; a second one says so and stops
+static void Begin()
+{
+    char self[MAX_PATH] = "";
+    GetModuleFileNameA(g_self, self, MAX_PATH);
+    char file[MAX_PATH], what[160];
+    if (OtherCopy(file, sizeof file, what, sizeof what)) {
+        char line[MAX_PATH + 300];
+        sprintf_s(line, "another copy of ROTKPlus started too, the %s %s (%s): it changes nothing, %s is at work",
+                  kKind, ROTKPLUS_VERSION, self, what);
+        HMODULE first = file[0] ? GetModuleHandleA(file) : nullptr;
+        typedef void(__cdecl* NoteFn)(const char*);
+        NoteFn note = first ? (NoteFn)(void*)GetProcAddress(first, "ROTKPlusLog") : nullptr;
+        if (note) note(line);
+        sprintf_s(line, "ROTKPlus %s (%s): %s is already at work in this game, this copy changes nothing", ROTKPLUS_VERSION,
+                  kKind, what);
+        RotkFixLog(line);
+        return;
+    }
+    char note[MAX_PATH + 128];
+    sprintf_s(note, "%lu|%s|ROTKPlus %s, the %s", GetCurrentProcessId(), self, ROTKPLUS_VERSION, kKind);
+    SetEnvironmentVariableA(kActiveVar, note);
+    g_active = true;
+    Start();
+}
+
+#if defined(ROTKPLUS_MOD)
+// Called once by ROTK Fix after it has loaded the mod (ROTKFix\mods\ROTKPlus.dll), at the game's first Direct3DCreate8.
+// Settings, statistics and logs stay in the game folder, as with the proxy.
+extern "C" __declspec(dllexport) void __cdecl ModInit(void)
+{
+    static bool started;
+    if (started) return;
+    started = true;
+    GetModuleFileNameA(nullptr, g_dir, MAX_PATH);
+    if (char* s = strrchr(g_dir, '\\')) *s = 0;
+    Begin();
+}
+#endif
+
 BOOL APIENTRY DllMain(HMODULE mod, DWORD reason, LPVOID)
 {
     if (reason == DLL_PROCESS_ATTACH) {
         DisableThreadLibraryCalls(mod);
+        g_self = mod;
         InitializeCriticalSection(&g_logCs);
+#if !defined(ROTKPLUS_MOD)
         GetModuleFileNameA(mod, g_dir, MAX_PATH);
         if (char* s = strrchr(g_dir, '\\')) *s = 0;
-        Start();
-    } else if (reason == DLL_PROCESS_DETACH) {
-        __try {
+        Begin();
+#endif
+    } else if (reason == DLL_PROCESS_DETACH && g_active) {
+        Guard([&] {
             const DWORD s = (GetTickCount() - g_startTick) / 1000;
             Log("session end after %lu min %lu s", s / 60, s % 60);
             // ROTK Fix rewrites its log at every start: a copy next to this session's own, with the same date and time,
@@ -323,7 +431,7 @@ BOOL APIENTRY DllMain(HMODULE mod, DWORD reason, LPVOID)
                 sprintf_s(to, "%s\\ROTKPlus_logs\\ROTKFix_%s.log", g_dir, g_logStamp);
                 Log("log: copy of ROTKFix.log: %s", CopyFileA(from, to, TRUE) ? to : "not made");
             }
-        } __except (EXCEPTION_EXECUTE_HANDLER) {}
+        });
     }
     return TRUE;
 }

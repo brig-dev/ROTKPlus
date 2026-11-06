@@ -13,8 +13,10 @@ Thank you for looking at ROTKPlus. The most useful things you can do:
 
 ## Notes for code changes
 
-- The code is C++17 for MSVC, 32-bit, with inline assembly in "naked" trampolines. See the comment at the top of
-  `src/ROTKPlus.h` about `GameFn`: calls from C++ to a naked trampoline must go through it.
+- The code is C++17, 32-bit, and must build with both MSVC (`DivxMediaLib.dll`) and mingw-w64 g++ (`build.sh`,
+  the Athelas mod). Inline assembly lives in "naked" trampolines written with the `ASM(...)` lines of `src/ROTKPlus.h`
+  (no `__asm` blocks), and code that reads game objects which may be gone uses `Guard` instead of `__try`. See also the
+  comment at the top of `src/ROTKPlus.h` about `GameFn`: calls from C++ to a naked trampoline must go through it.
 - Every patch checks the bytes it replaces (`Patch`, `PatchDword`, `PatchCall`, `PatchJmp`). Keep it that way: an
   executable that is not the expected one must be left untouched.
 - Addresses are for `rotk.exe` 1.0 (1,703,936 bytes). Comments give the address and what the function does;

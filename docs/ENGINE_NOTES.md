@@ -42,6 +42,22 @@ specification: if you find an error, please open an issue.
   8 Min04, 9 Osg01, 10 She01, 11 Cir00, 12 Cra01, 13 Fro03 (the menu), 14 Cir01, 15 Pat02, 16 Pal01, 17 Pal02). The map
   chooses with `0x481440(level)`. The hero-selection scene is prepared by passing through the map: it cannot be
   skipped.
+- The map (mode 4, `SceneSelScreen`) has 28 places, the selected one at `0x8E57B4`: 0-12 the levels (the same numbers,
+  table `0x540D40` from level to place), then the special features. Names and paths at `0x540D88` (two pointers per
+  place), the four neighbours at `0x540B80` (16 bytes per place, in the order of the directions `0x100`, `0x200`,
+  `0x40`, `0x80` read by `0x4F16A0`, which also takes the confirm `0x2000`). `0x4F1590` opens the map and picks the place
+  (from the previous level `0x562A58`); `0x4F11A0(place)` says whether a place is open, from `0x482230(level, co-op)`
+  (unlocked levels), which the hero selection also asks through `0x482530(hero, level, co-op)`.
+- Entities: a table of types at `0x565FA8` (0x38 bytes each: a range of type numbers, then functions; `+0x20` creates
+  one from its template, `0x48DA80`). The characters are 0..999 (create `0x412240` -> `0x412140(template, spawned)`;
+  the players come from `0x4927A0`, which calls `0x412140` too); spawners 1000..1099 (`EntitySpawner`: list at
+  `0x5C09FC`, update `0x48DFF0`, one spawn `0x48DD70`). Character types (0..0x59, the template's `+4` -> `+4`) have a
+  row of 0x38 bytes at `0x55ADB8`: `+0` the object's size, `+0xC` its initialisation; the computer's characters share
+  `0x417760` at `+0x10`, and `0x4189F0` puts a list of types on the players' side. `0x412140` returns 0 for a character
+  marked single player only (`+0x14` bit 8 of its data) in co-op.
+- Audio: `0x461930(emitter, command, n, a, b, c)`; the scripts' "audio: play" (`0x45DB30`) is command 1 with the
+  emitter of the script's entity and `n` one of its sounds (0..7), "play ig stream" (`0x45DBB0`) command `0xE`. The
+  sounds of a level are in its package (`.scw`, chunks `RDHS`/`rdhs` and `pmas` in the file): they have no names.
 
 ## Lives and death
 
@@ -50,7 +66,9 @@ specification: if you find an error, please open an issue.
 - The "die" state (id `0x28`; state table at `0x561420`: `+8` update `0x434D80`, `+0xC` enter `0x434ED0`, `+0x10` leave
   `0x434FA0` with "RessurectFx1"): on entering, if co-op, lives remain and "the other player" (`0x445A40`) is not itself
   in the "die" state, a life is consumed and the character respawns; otherwise the defeat sequence `0x43FE40`, then
-  `0x4F6E90(1)`.
+  `0x4F6E90(1)`. The update adds its time (third argument, seconds) to `+0xD0 -> +0x104` and makes the character get
+  up (state `0x2B`) when that reaches 10 (`0x434DE3`, the constant `0x53618C`, shared with dozens of other
+  computations); `0x4ED110` shows `10 - (+0xD0 -> +0x104)` as the countdown.
 
 ## Combat
 
@@ -64,8 +82,22 @@ specification: if you find an error, please open an issue.
 - Melee: `0x40EF50(attacker, centre, radius)` -> `0x47D180` -> collision system (sweep and prune: `0x4795F0`,
   `0x479CA0`; volumes at `0x5BB9E4`, stride `0xE0`: `+0` shape, `+1`, `+2` type (1 body, 5 hittable), `+3` state, `+4`
   check function, `+0x10` owner). The side filter is `0x40EDC0`. The hit shapes `0x415070`, `0x4152C0`, `0x4154F0` keep
-  type-5 volumes only; `0x4185C0` sends the hit. *(unknown: why another player's type-5 volume never reaches the
-  search)*
+  type-5 volumes only; `0x4185C0` sends the hit: `0x401780(victim, 0x259, data, &result, attacker)` at `0x418758`
+  (data is its second argument), then `0x260` to the attacker. *(unknown: why another player's type-5 volume never
+  reaches the search)*
+- Audio: `0x461930(emitter, command, n, a, b, c)`; the level scripts call it from `0x45DB30` (return `0x45DB6C`). At the
+  Black Gate (bla01) the crowd is command 1, n 2, (5, 255, 0) on the emitters 0-7, 12 and 13 within half a second, each
+  time Aragorn hits the boss.
+- The physical attack (state `0x1E` "phys": a kick, a shove) is a melee hit of kind 6 with no damage: it never reaches
+  `0x40CF80`. At `0x418758` the result byte is set to 1 before the call (`0x418729`); a victim's handler clears it when
+  the blow does not land (a shield, below).
+- Shields: the handlers `0x41C4A0` (orcs) and `0x421720` keep the shield's strength at `+0x808`. A blocked hit plays
+  "shieldhit" and clears the result; the hit that takes the strength to zero hides "01SHIELD" (or "01SHLD000_SHLD") in
+  the model and plays "orcshieldbreak" (`0x401650` at `0x41C941`, `0x4016B0` at `0x421A0C`); both handlers have an EBP
+  frame with the event at `[ebp+0xC]`.
+- The player states' names: table at `0x561060` (`0x18` bytes: id, name). Speed attacks `0x08`-`0x0D`
+  (`speed_attack_1`..`speed_3_trans`), fierce `0x0E`, `0x0F`, `0x10`, `0x1D`, combos `0x11`-`0x1C`, `phys` `0x1E`, parries
+  `0x1F`-`0x27`, `die` `0x28`, the special attack `dev_wind`..`dev_strike` `0x2D`-`0x30`, `kill` `0x31`.
 - R2 execution: state "kill" `0x31` (`0x43C410`); victim chosen by `0x435F00 -> 0x435E20` (character on the ground, enemy
   side). Gandalf's area magic `0x439E40`; an area blast `0x419020`.
 - Projectiles: contact `0x454940` (side rules at `0x454C12`), volume check `0x4543A0` (friendly fire), hit `0x4547C0`.
@@ -83,10 +115,23 @@ specification: if you find an error, please open an issue.
   block, `[2]` experience, `[3]` life, `[6]` ring, `[0x11..0x22]` hero portraits/weapons. `0x4ECD00(character)` fills a
   block (the second block only for `g_players[1]`, the first for everybody else); `0x4ED290` updates a character's HUD
   and the "g1"/"g2" marks (elements `coopmark1p/2p` at `0x8E2904/08`); `0x4ED110` writes the respawn countdown into
-  the separate elements `respawna`/`respawnb`; `0x4ED4D0` level-up, `0x4ED240` hit flash.
+  the separate elements `respawna`/`respawnb`; `0x4ED4D0` level-up, `0x4ED240` hit flash. In a block, `+0x34` is
+  `coopkillsnum` (the kills under the box: `0x4ECD00` writes the number into its `+0x88`), `+0x38` `coopkills` (the word:
+  its text is the key `kills`, translated when it is drawn). For a
+  character in the "die" state `0x4ECD00` does not write the block's values: they stay those of whoever used the block
+  before.
+- Other HUD elements: `respawncount` (the number of the shared lives, `0x8E28E0`, `+0x88` written by `0x4ECD00`),
+  `cooplife` (their icon, `0x8E28F4`), `checkpoint` (`0x8E28F8`), `combo` (`0x8E28FC`), `combo.combotext` (`0x8E2900`).
+  The allies' HUD at the top right: `followera`, `followerb`, `followerc` (`0x8E290C`, `0x8E2934`, `0x8E295C`, found
+  by `0x4EC390`...), a portrait in a ring, `health` and the heroes' portraits. `enemyhud` is not an element on the
+  screen: `0x4EB4C0(character, &life, bone, name)` fills one of 8 slots at `0x8E2120` (`0xE0` bytes: `+0x20` the
+  character), and `0x4EBE90` -> `0x4EB6D0` draws each one's bar above its character with `0x4E8F50`.
 - The game's texts: `0x4E3F00(key, 0x47EF50(0))` returns the text for a key in the current language.
 - Screens: mode `0x562AC0`, previous mode `0x562AC4`, changed by `0x47FA20(mode)`. Modes: 0 game, 1 hero selection,
-  2 score, 3 shop, 4 map, 6 save, 14 loading, 16 co-op statistics, 17 main menu. The selection scene object holds each
+  2 score, 3 shop, 4 map, 6 save, 14 loading, 16 co-op statistics, 17 main menu. At the end of a level the game writes
+  999 (998 towards the menu) without `0x47FA20`, then asks for the next screen. After a co-op victory: 2 (once per
+  player, each hero gets the level's experience there), 16, 3 (once per player), 6. A level can also be left straight
+  towards 4, 1 or 17. The selection scene object holds each
   hero's state at `+0x124 + hero*4` (computed by `0x456210`; 4 = taken, 5 available). Menu actions go through the loop
   `0x4EAA60` and the handler `0x4EA0F0` (via `[0x56DC70]`; 0 up, 2 down, 4 right, 5 left, 7 confirm, 8 back);
   `0x4EA200(slot)` writes the slot *excluded* from the menus (`0x56DC75`).
@@ -108,3 +153,18 @@ specification: if you find an error, please open an issue.
 
 - In co-op `0x46FB10` computes the points to follow of players 1 and 2 (`0x5A5BA0`, `0x5A5B90`) with `0x4402C0` and
   `0x46F530` frames the pair. `0x43DCB0(character, speed)` returns the edge of the frame a character is pushing against.
+
+## Characters, models and the HUD's elements (05/11/2026)
+
+- The characters are a list at `0x579188` linked at `+0x60`; `0x410630` takes out those with `+0x70` negative (unless
+  their model is marked to be kept), calls their type's function at `0x55ADD4 + type * 0x38` and, with bit 30 of `+0x8C`,
+  tells their spawner (`0x48E0D0`). Setting `+0x70 = -1` is how a character is taken away the game's own way.
+- The model: character `+0x64` -> object to draw (first byte 1) `+4` -> character control (`0x45BA00`, the animation
+  library) `+4` -> definition: `+0x18` parts, `+0x1C` their table (0x18 bytes: `+0` number of named bones, `+0x14` the
+  names, 0x14 bytes each, packed in 16 bytes and decoded by `0x4954E0`, the bone's number at `+0x10`). Bones are looked
+  up by name (`0x45ECE0`, "JO_Root", "JO_weapon_R"...); every character shares the names and the first bones (root,
+  pelvis, lumbar, hips), but the numbers differ from one model to the next after those.
+- The HUD's named elements: the table at `*0x8DCF1C` (size at `+4`, from `+8` entries of 12 bytes: name, ?, element;
+  `0x58585858` at the end), searched by `0x4ED6D0`; an element's children at `+4` (count, then the elements), searched by
+  `0x4ED860`; `0x4ED940(parent, "a.b")` walks a dotted path. The boss's ring at the top right is the element holding
+  "underring" ("timer" at the Black Gate: the ring's pieces, the boss's life "thealth" and the bosses' portraits).

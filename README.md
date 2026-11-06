@@ -23,8 +23,8 @@ changes nothing on disk except the file it replaces (see *Installation*).
 
 ## Features
 
-- Main menu: **Co-op: N players** and, right below it, **Versus: N players**. With the cursor on the entry, left/right
-  cycle through 2, 3 and 4 players (the choice is remembered).
+- Main menu: **Multiplayer**, with a page where the mode (campaign, everybody against everybody, teams), the number of
+  players, the enemies, the lives, the teams and who plays are chosen together (see *Using it*).
 - Third and fourth player in the same level: they pick their hero after players 1 and 2 in the selection screen, are
   created next to player 2, and have their own HUD box (top right and top left), a green/yellow mark with "g3"/"g4"
   above their head, a respawn countdown, level-up effects, kills and experience.
@@ -35,8 +35,21 @@ changes nothing on disk except the file it replaces (see *Installation*).
   controller only.
 - Versus mode: melee hits, combos, specials, the R2 / RT execution (half of the victim's life), arrows with lock-on, the
   spear, Gandalf's area magic, and blocking all work between players. Two lives each by default; whoever loses them
-  stays on the ground; the last one standing wins, with a banner and a level-up effect, and the level closes. It works
-  on any level (with the level's enemies, everybody against everybody).
+  stays on the ground; the last one standing wins, with a banner and a level-up effect, and the level closes. The map
+  offers three arenas: the Southern Gate, the Courtyard of Minas Tirith and the Black Gate (open even if not unlocked
+  yet; `[PvP] ArenasOnly=0` gives back every level). With **2 vs 2** players 1 and 2 play against 3 and 4
+  (`[PvP] Team1` changes the pairs): teammates cannot hit each other, the teams are shown at the start and the last team
+  standing wins; the teams are the Sun's and the Moon's. With **heroes only** the enemies are not created (the allies
+  are); otherwise the level's enemies fight everybody. Every player's lives left are in their HUD box, the knock-downs
+  appear at the bottom as they happen ("Alex downs Robin"), and the teams' totals between the top boxes. The
+  Multiplayer page also chooses the **victory** (last one standing, or **timed**: 2, 3 or 5 minutes, the most
+  knock-downs win, back on your feet after 5 seconds) and a **tournament** at the best of 3 or 5 rounds, with a Cup for
+  the winner; a timed round tied at the end goes to **sudden death** (the next knock-down wins). After the game the map
+  comes back at once, without the game's score screens, with the **Last game** over it (who won, everybody's
+  knock-downs and falls). At the Black Gate with the heroes only, its boss still plays its opening scene (Frodo's
+  mithril) and then leaves before the fight.
+  A sound of the level when a player hits another one and a music at the start can be set in the ini (see
+  `[PvP] Cheer_<level>`, *experimental*).
 - Progress of the extra players (levels, experience, purchases) shows up in the save game under the first player's
   profile: in the tests, players 1, 3 and 4 saw it when they loaded the same save slot.
 - **Fellowship** entry in the main menu (from 1.2; "Compagnia" in Italian): a name for each player, typed with the
@@ -44,8 +57,8 @@ changes nothing on disk except the file it replaces (see *Installation*).
   levels played, won and completed, time, kills (of which at range, with spears, killing moves and in single-player
   games), assists (you hit an enemy, a teammate finishes it within 15 seconds), deaths, kills by rating, experience,
   favourite hero; kills by kind of enemy (with soldiers, shields, archers and captains apart) and of every boss, combos
-  by name, parries, ladders pushed down, enemies set on fire, things picked up; in Versus games,
-  wins, opponents knocked down and own falls; and the same per hero. A **Comparison** of four players in six tabs, a
+  by name, parries, ladders pushed down, enemies set on fire, kicks, things picked up; in Versus games,
+  wins, opponents knocked down and own falls, who knocked down whom, tournaments and Cups; and the same per hero. A **Comparison** of four players in six tabs, a
   **profile** of each player, **records**, the **last game**, and **name management** (add, rename, merge two names,
   delete). **Who is playing?** before every game gives each place its name. The names also appear above the players'
   heads and in the hero selection ("Player 1 - Alex, select your character") and in the Versus winner banner. The third
@@ -57,20 +70,20 @@ changes nothing on disk except the file it replaces (see *Installation*).
 - The game, in the version that Athelas calls "Game v1.0" (`rotk.exe` of 1,703,936 bytes). Other
   executables are detected and ROTKPlus does nothing.
 - [Athelas](https://github.com/Shagg88/Athelas) with ROTK Fix set up for the game (it provides `SDL3.dll`, the
-  controller layer and the graphics fix). Tested with Athelas 1.5 to 1.8.0.
+  controller layer and the graphics fix). Tested with Athelas 1.5 to 1.8.1.
 - One controller per player (Xbox-style, PlayStation, anything SDL3 supports). Without a controller an extra player
   stands still (or, with `KeyboardFallback=1`, moves with player 1's keys).
 
 ## Installation
 
-Download `ROTKPlus-1.2.1.zip` from [GitHub Releases](https://github.com/brig-dev/ROTKPlus/releases) or from
+Download `ROTKPlus-1.4.0.zip` from [GitHub Releases](https://github.com/brig-dev/ROTKPlus/releases) or from
 [ModDB](https://www.moddb.com/mods/rotkplus/downloads), then:
 
 1. Close the game. Make a backup copy of the game folder if you wish.
 2. In the game folder, rename `DivxMediaLib.dll` to `DivxMediaLib_orig.dll`.
 3. Copy `DivxMediaLib.dll` from the zip (or the one you built) into the game folder. ROTKPlus *is* a
-   `DivxMediaLib.dll`: it forwards every call to the original and adds the mod. The game loads it when the first movie
-   starts, so keep ROTK Fix's `SkipOpeningLogos = 0`.
+   `DivxMediaLib.dll`: it forwards every call to the original and adds the mod. The game loads it as soon as it starts,
+   before the opening movies.
 4. Copy `ROTKPlus.ini` from the zip next to `rotk.exe`; it already has `[Coop] Enabled=1`. If you built the mod yourself,
    copy `config/ROTKPlus.ini.example` and rename it `ROTKPlus.ini` (it has the same defaults). Without the ini file the
    mod stays **off**; `Enabled=0` turns it off again.
@@ -78,6 +91,10 @@ Download `ROTKPlus-1.2.1.zip` from [GitHub Releases](https://github.com/brig-dev
    the date and time, and never overwrites the earlier ones; `ROTKPlus.log` is a copy of the latest. See *Logs*.
 
 To remove it, delete ROTKPlus's `DivxMediaLib.dll` and rename `DivxMediaLib_orig.dll` back.
+
+ROTKPlus also comes as a mod of Athelas (from Athelas 1.8.1, which has ROTKPlus 1.3.0): turn it on in the launcher's
+**Mods** tab instead of copying `DivxMediaLib.dll`. Use one of the two ways, not both (with both, only one changes the
+game, and the log says which).
 
 ## Logs
 
@@ -97,9 +114,15 @@ it; [TESTING.md](TESTING.md) explains how to download and run it.
 
 ## Using it
 
-In the main menu choose **Co-op: 3 players** (or 4), or **Versus: 3 players**, and confirm. Players 1 and 2 choose
-as usual; then the third and fourth players choose their heroes, one after the other, with their own controllers. In a
-level the extra players join right away. Use the same save slot for players 1 and 2 to see everybody's progress.
+In the main menu choose **Multiplayer** and confirm. Its page has two boxes: on the left the game (mode: campaign,
+everybody against everybody or teams; the players, 2 to 4; for the Versus modes the enemies or the heroes only, the
+lives and the pairs of the teams), on the right who plays (a name for each place, as in *Who is playing?*). Up/down go
+through the rows of a box, the shoulder buttons (or Tab) go to the other box, left/right change the selected row, each
+extra controller changes its own place; confirm or **Start** goes on to
+the map. Players 1 and 2 choose their heroes as usual; then the third and fourth players choose theirs, one after the
+other, with their own controllers. In a level the extra players join right away. Use the same save slot for players 1
+and 2 to see everybody's progress. (`[Players] MultiplayerPage=0` gives back the two entries of before, **Co-op: N
+players** and **Versus: N players**, with their choices on left/right.)
 
 **Fellowship** (main menu): up/down choose an entry; on the right a preview shows what it holds. On one of the four
 places, left/right (or the arrows) pick one of the names used before, Guest (no statistics) or *New name...*; confirm
@@ -162,8 +185,18 @@ respawns, the hero selection and the end-of-level screens. It is a testing aid, 
 | | `Pad`, `PadName` | use controllers for the extra players; pick the third one by part of its name |
 | | `Hud`, `HudX`, `HudY`, `HudRow`, `HudScale` | position and size of the extra HUD boxes |
 | `[PvP]` | `Enabled`, `Players`, `Lives` | the Versus entry, its number of players, lives per player |
+| | `Teams`, `Enemies`, `Team1` | 2 vs 2 and heroes only (also changed from the menu); the two players of team 1 (`12`, `13`, `14`) |
+| | `ArenasOnly` | the map offers only the three arenas in Versus games (1, default) |
+| | `Rule`, `Time`, `Rounds` | last one standing (0) or timed (1), the minutes, the rounds of a tournament (1, 3, 5); also on the Multiplayer page |
+| | `TimedRespawn` | seconds on the ground in a timed game (5; the game's own is 10) |
+| | `SkipScoreScreens` | after a Versus game straight to the map (1, default) or the game's score screens (0) |
+| | `BossScene` | with the heroes only, the Black Gate's boss comes for its opening scene and then goes away (1, default) |
+| | `LastGame` | after a Versus game the Last game over the map until confirm or back (1, default) |
+| | `SuddenDeath` | a timed round tied at the end goes on until the next knock-down (1, default) |
+| | `Cheer_<level>`, `Music_<level>`, `CheerEvery` | audio commands of the level for hits and for the start (see the example ini) |
 | `[Players]` | `Enabled`, `TextScale`, `TableScale`, `Shade` | the Fellowship entry (names and statistics); size of its texts; the dark rectangle behind them (0 none, 1 black) |
 | | `AskWhoPlays` | "Who is playing?" before every game (1, default) or the names of the Fellowship page (0) |
+| | `MultiplayerPage` | one Multiplayer entry with its page (1, default) or the Co-op and Versus entries (0) |
 | | `HeadNames`, `HudNames`, `NameScale` | names above the heads in place of g1-g4 (on by default) and above the HUD boxes (off) |
 | | `ScoreSummary`, `SummaryScale`, `SummaryY` | the level summary on the score screen (off by default) |
 | | `CaptureIcons` | make the portraits from the game's own (1, default) |
@@ -184,12 +217,26 @@ key: the keys of the menu texts are in the example, those of the Fellowship page
 
 ## Building
 
-Visual Studio 2022 or later (the "Desktop development with C++" workload), MSVC, 32-bit:
+The same sources build two ways:
 
-    msbuild ROTKPlus.slnx /p:Configuration=Release /p:Platform=x86
+- **`DivxMediaLib.dll`** (the install described above), with Visual Studio 2022 or later (the "Desktop development
+  with C++" workload), MSVC, 32-bit:
 
-The output is `src/Release/DivxMediaLib.dll`. The code uses MSVC inline assembly and will not build with other
-compilers. The `src` folder has one file per area; the top of each file explains what it patches and why.
+      msbuild ROTKPlus.slnx /p:Configuration=Release /p:Platform=x86
+
+  The output is `src/Release/DivxMediaLib.dll`.
+- **`ROTKPlus.dll`**, a mod of Athelas, with the 32-bit mingw-w64 g++ (Debian and Ubuntu: `g++-mingw-w64-i686`), on
+  Linux or with a mingw-w64 toolchain on Windows:
+
+      sh build.sh
+
+  Copy `ROTKPlus.dll` and `athelas/ROTKPlus.ini` into `ROTKFix\mods\` in the game folder and turn it on in the
+  launcher's Mods tab; ROTK Fix starts it (`ModInit`). Settings, statistics and logs stay in the game folder. If the
+  `DivxMediaLib.dll` install is there too, only one of the two changes the game and the log says which.
+
+The inline assembly is written once for both compilers (`ASM(...)` lines, see `src/ROTKPlus.h`), and the reads of game
+objects that may be gone go through `Guard` (`src/Guard.cpp`). The `src` folder has one file per area; the top of each
+file explains what it patches and why.
 
 ## How it works
 
@@ -208,7 +255,7 @@ This is a one-person hobby project, and it has been tested on very few setups. *
   Versus mode, and on the Steam Deck or other Linux setups (Proton). Tell us what works and what does not, with the log
   of that session (`ROTKPlus_logs`) attached. [TESTING.md](TESTING.md) has a test round (even its first steps help), the
   log checker, and how to report; there is a **test report** form when you open an issue.
-- **Improvements and integrations.** Ideas that would be great: team play (2 against 2) in Versus mode, a Versus ending that
+- **Improvements and integrations.** Ideas that would be great: the crowd's cheers and other music in the Versus arenas, a Versus ending that
   does not go through the co-op screens, a "defeated" caption for eliminated players, separate save profiles for the extra
   players, integration with Athelas / ROTK Fix's own mod system. Pull requests and suggestions are both welcome.
 - **Translations** of the mod's few texts (see *Language*).
