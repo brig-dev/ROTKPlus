@@ -20,7 +20,7 @@ from collections import Counter
 # ROTKFix.dll sizes of the versions we know (the 1.1+ log lists the file sizes of the fix and of its companions)
 ROTKFIX_SIZES = {412672: "ROTK Fix 1.5", 418304: "ROTK Fix 1.6.0", 422400: "ROTK Fix 1.7.1",
                  426496: "ROTK Fix 1.7.2", 462848: "ROTK Fix 1.7.3", 464384: "ROTK Fix 1.7.5, 1.7.6 or 1.7.7",
-                 472064: "ROTK Fix 1.7.8", 474624: "ROTK Fix 1.8.0"}
+                 472064: "ROTK Fix 1.7.8", 474624: "ROTK Fix 1.8.0 or 1.8.1"}
 
 
 def find_log(path):
@@ -182,7 +182,7 @@ def main(argv):
     elif not coop_on:
         pass
     elif any(t.startswith("main menu: entry MainMenuScreen.Coop") for t in texts):
-        print("  ok       main menu entries (Co-op / Versus)")
+        print("  ok       main menu entries (Multiplayer, or Co-op / Versus)")
     elif any(t.startswith("main menu:") for t in texts):
         warnings.append("the main menu was shown but the Co-op entry was not found in the log")
     else:

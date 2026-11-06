@@ -40,11 +40,12 @@ installed correctly on your setup and the interesting part of your report is how
 ## A quick test round
 
 1. **Start the game from Athelas**, reach the main menu and quit. Run `check_log.py` on the game folder: it should say
-   `ROTKPlus 1.1.0` (or newer) and `OK`. Without Python, open the newest file in `ROTKPlus_logs`: any line with `ERROR`,
+   `ROTKPlus 1.4.0` (or newer) and `OK`. Without Python, open the newest file in `ROTKPlus_logs`: any line with `ERROR`,
    `NOT installed` or `CRASH` is important.
-2. **Main menu.** Do you see "Co-op: N players" and below it "Versus: N players" (or the equivalents in your language)? Do
-   left/right cycle through 2, 3 and 4? Do the entries show your language?
-3. **Co-op with 3 players.** Pick Co-op 3, choose heroes (player 3, and then player 4, choose after players 1 and 2),
+2. **Main menu.** Do you see "Multiplayer" (or the equivalent in your language)? Confirm it: on the left the game (mode,
+   players, enemies, victory, lives, tournament), on the right who plays. Do up/down, left/right and the shoulder buttons
+   (or Tab) work, and does each extra controller change its own place? Are the texts in your language?
+3. **Co-op with 3 players.** On the Multiplayer page pick Campaign and 3 players, Start, choose heroes (player 3, and then player 4, choose after players 1 and 2),
    start any level. Do all heroes appear, does each controller drive the right hero, do the HUD boxes and the g3 / g4
    marks look right?
 4. **Fight, die and respawn.** Let an extra player die: is there a respawn countdown, does it come back? Are the lives
@@ -52,14 +53,15 @@ installed correctly on your setup and the interesting part of your report is how
 5. **Finish the level.** Do the score, statistics and shop screens give every player a turn, with their own controller
    only? Do the kill counts of players 3 and 4 start from zero in every level?
 6. **Co-op with 4 players**, the same checks.
-7. **Versus mode** with 2, 3 and 4 players: do hits, combos, specials, arrows, the spear and blocking work between players?
-   Does the last player standing win, with a banner, and does the level close?
+7. **Versus** with 2, 3 and 4 players, and 2 vs 2: do hits, combos, specials, arrows, the spear and blocking work between
+   players, and not between teammates? With the heroes only, last one standing and timed (a tie goes to sudden death),
+   and a tournament: is the winner right, and does the map come back with the Last game over it?
 8. **Save and load.** Save, quit, load the same slot: do players 3 and 4 keep their progress?
 9. **Fellowship entry** (1.2 and later): give names with the keyboard and with a controller, play a level, look at
    Comparison (all six tabs), a player's profile, Records and Last game. Are the texts readable in your language and at
    your screen size, do kills, assists and deaths look right for each player? Does the mouse work on the pages?
-10. **Who is playing?** (1.2 and later): after Single, Co-op or Versus, does the page show one row per player with the
-    last line-up? Can each controller change its own row, and does Start lead to the hero selection with those names?
+10. **Who is playing?** (1.2 and later): after Single, or on the right of the Multiplayer page, does it show one row per
+    player with the last line-up? Can each controller change its own row, and does Start lead to the hero selection with those names?
 
 ## Things we especially want to know
 
@@ -67,7 +69,7 @@ installed correctly on your setup and the interesting part of your report is how
 - Controllers other than Xbox / PlayStation / Steam Controller; two identical controllers; a controller unplugged while playing.
 - The Steam Deck, and four players on Linux (three players on SteamOS with Proton have been tested).
 - Levels other than the first ones: levels with computer allies, long levels, the last levels, levels with cutscenes.
-- Athelas versions newer than 1.8.0.
+- Athelas versions newer than 1.8.1, and ROTKPlus as an Athelas mod (the launcher's Mods tab).
 - Wide screens (21:9 and wider): the Fellowship pages were only seen at 16:9.
 
 ## How to report

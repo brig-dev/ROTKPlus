@@ -5,7 +5,8 @@ Co-op with **3 and 4 players** and a **player-versus-player mode** for
 
 The game ships with a 2-player co-op. ROTKPlus adds a third and a fourth hero to the same level, each with its own
 controller, HUD box, mark above the head, shared lives, level-up, and turn in the end-of-level screens. It also adds a
-**Versus** entry to the main menu, where 2 to 4 players fight each other on any level.
+**Versus** mode for 2 to 4 players (everybody against everybody or 2 vs 2, timed games, tournaments) and names and
+statistics for every player. Everything starts from one **Multiplayer** entry in the main menu.
 
 ROTKPlus is a small DLL, not a replacement for the game. It works together with
 [ROTK Fix / Athelas](https://github.com/Shagg88/Athelas) by Shagg88 (which makes the game run on modern PCs), and it
@@ -14,12 +15,11 @@ changes nothing on disk except the file it replaces (see *Installation*).
 **Download:** [GitHub Releases](https://github.com/brig-dev/ROTKPlus/releases) or
 [ModDB](https://www.moddb.com/mods/rotkplus/downloads) (same file). Mod page: <https://www.moddb.com/mods/rotkplus>. What changed: [CHANGELOG.md](CHANGELOG.md)
 
-> **Status:** version 1.2.1. ROTKPlus 1.0.0 was tested on Windows 11 with Athelas 1.5 and 1.6.0, the Italian edition of
-> the game and up to four controllers, and on SteamOS (Proton) with Athelas 1.6.0: about two hours of the campaign with
-> three controllers and the Versus mode with three players. With 1.2.0 the whole campaign was played on SteamOS (Proton)
-> with Athelas 1.7.x, and the Fellowship pages were tested on Windows 11 with Athelas 1.8.0, with controllers, keyboard
-> and mouse. Not tested on the Steam Deck. English is the default language of the mod's own texts; Italian was verified
-> in the game; French, German and Spanish are untested translations (see *Language*).
+> **Status:** version 1.4.0. Tested on Windows 11 with Athelas 1.5 to 1.8.1, the Italian edition of the game, up to four
+> controllers, keyboard and mouse (the 1.4 Versus modes with two and four players). On SteamOS (Proton): the Versus mode
+> with three players (1.0.0), the whole campaign with Athelas 1.7.x (1.2.0), and the 1.4 pages and `FastText=2` with
+> Athelas 1.8.1 and two controllers. Not tested on the Steam Deck. English is the default language of the mod's own
+> texts; Italian was verified in the game; French, German and Spanish are untested translations (see *Language*).
 
 ## Features
 
@@ -137,7 +137,8 @@ last letter, *Done* saves and back cancels. A word starts with a capital letter,
 - **Records**, **Last game**, and **Manage names** (add a name, or choose one and rename it, merge it into another one,
   or delete it with its statistics; deleting and merging ask for confirmation).
 
-**Who is playing?** comes after Single, Co-op or Versus: one row per player with the last line-up, left/right change a
+**Who is playing?** comes after Single (and after Co-op or Versus with `MultiplayerPage=0`; the Multiplayer page has
+its own *who plays* box): one row per player with the last line-up, left/right change a
 row's name (every controller its own row), Start goes on to the hero selection. The statistics of a level are written
 when the level is left (won, lost, or quit to the map or the menu); a level interrupted by a crash is not counted. A
 player without a name is a guest: shown as "Player N", nothing is saved.
@@ -158,8 +159,8 @@ Key `F9` (only if `[Diag] VictoryKey=1`) ends the level with a victory: useful t
 
 ### Testing without controllers
 
-With `[Debug] SimPads=1` in `ROTKPlus.ini` players 2, 3 and 4 are driven by the keyboard and the game offers the Co-op
-entry even with no controller connected; player 1 uses the game's own keyboard and mouse controls. Start the game from
+With `[Debug] SimPads=1` in `ROTKPlus.ini` players 2, 3 and 4 are driven by the keyboard and the game offers the
+Multiplayer entry even with no controller connected; player 1 uses the game's own keyboard and mouse controls. Start the game from
 Athelas with no controller connected. The keys work only while the game window has the focus:
 
 | Player | Move | Cross (fast attack) | Circle (heavy attack) | Square (parry) | Triangle (fierce attack) | R2 (execution) |
@@ -184,7 +185,7 @@ respawns, the hero selection and the end-of-level screens. It is a testing aid, 
 | | `Hero` | hero of the third player if not chosen (`auto`, `aragorn`, ...) |
 | | `Pad`, `PadName` | use controllers for the extra players; pick the third one by part of its name |
 | | `Hud`, `HudX`, `HudY`, `HudRow`, `HudScale` | position and size of the extra HUD boxes |
-| `[PvP]` | `Enabled`, `Players`, `Lives` | the Versus entry, its number of players, lives per player |
+| `[PvP]` | `Enabled`, `Players`, `Lives` | the Versus modes, their number of players, lives per player |
 | | `Teams`, `Enemies`, `Team1` | 2 vs 2 and heroes only (also changed from the menu); the two players of team 1 (`12`, `13`, `14`) |
 | | `ArenasOnly` | the map offers only the three arenas in Versus games (1, default) |
 | | `Rule`, `Time`, `Rounds` | last one standing (0) or timed (1), the minutes, the rounds of a tournament (1, 3, 5); also on the Multiplayer page |
@@ -201,7 +202,7 @@ respawns, the hero selection and the end-of-level screens. It is a testing aid, 
 | | `ScoreSummary`, `SummaryScale`, `SummaryY` | the level summary on the score screen (off by default) |
 | | `CaptureIcons` | make the portraits from the game's own (1, default) |
 | `[General]` | `Language` | `auto`, `en`, `it`, `fr`, `de`, `es` or your own code |
-| | `FastText` | the mod's texts drawn in one go (1, default), also the game's own (2, untested), never (0) |
+| | `FastText` | the mod's texts drawn in one go (1, default), also the game's own (2, tested on Windows and SteamOS), never (0) |
 | `[Log]` | `Detail`, `Keep` | detailed level trace (0, default); how many session logs to keep (0 = all) |
 | | `StatsBackups`, `CopyRotkFixLog` | dated copies of the statistics to keep (10); a copy of `ROTKFix.log` (1) |
 
@@ -255,9 +256,9 @@ This is a one-person hobby project, and it has been tested on very few setups. *
   Versus mode, and on the Steam Deck or other Linux setups (Proton). Tell us what works and what does not, with the log
   of that session (`ROTKPlus_logs`) attached. [TESTING.md](TESTING.md) has a test round (even its first steps help), the
   log checker, and how to report; there is a **test report** form when you open an issue.
-- **Improvements and integrations.** Ideas that would be great: the crowd's cheers and other music in the Versus arenas, a Versus ending that
-  does not go through the co-op screens, a "defeated" caption for eliminated players, separate save profiles for the extra
-  players, integration with Athelas / ROTK Fix's own mod system. Pull requests and suggestions are both welcome.
+- **Improvements and integrations.** Ideas that would be great: cheers and music in the Southern Gate and the Courtyard
+  (only the Black Gate has its crowd), separate save profiles for the extra players, the siege engines (ballistas,
+  catapults) in the statistics. Pull requests and suggestions are both welcome.
 - **Translations** of the mod's few texts (see *Language*).
 - **Knowledge of the engine.** Corrections and additions to [`docs/ENGINE_NOTES.md`](docs/ENGINE_NOTES.md).
 
