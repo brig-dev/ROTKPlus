@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.1
+
+- Co-op and versus: **Aragorn as third or fourth player at the Black Gate** stayed still in the rest pose (arms open,
+  once in mid-air) after the opening scene with the Mouth of Sauron. The extra players always got the hero's plain
+  package (`char_ara`), while the game gives Aragorn at the Black Gate his own one (`Char_ArC`, another model), and
+  Sam and Frodo at the Crack of Doom theirs (`Char_SaC`, `Char_FrD`). Now the extra players get the same package as
+  players 1 and 2; the same rule finds the ally's package (`Foll_ArC`...) when a full list has to drop one.
+
 ## 1.4.0
 
 Versus grows up: one Multiplayer page, teams of the Sun and the Moon, heroes only, timed games and tournaments, the

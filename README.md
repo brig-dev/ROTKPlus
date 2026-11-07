@@ -15,7 +15,7 @@ changes nothing on disk except the file it replaces (see *Installation*).
 **Download:** [GitHub Releases](https://github.com/brig-dev/ROTKPlus/releases) or
 [ModDB](https://www.moddb.com/mods/rotkplus/downloads) (same file). Mod page: <https://www.moddb.com/mods/rotkplus>. What changed: [CHANGELOG.md](CHANGELOG.md)
 
-> **Status:** version 1.4.0. Tested on Windows 11 with Athelas 1.5 to 1.8.1, the Italian edition of the game, up to four
+> **Status:** version 1.4.1. Tested on Windows 11 with Athelas 1.5 to 1.8.2, the Italian edition of the game, up to four
 > controllers, keyboard and mouse (the 1.4 Versus modes with two and four players). On SteamOS (Proton): the Versus mode
 > with three players (1.0.0), the whole campaign with Athelas 1.7.x (1.2.0), and the 1.4 pages and `FastText=2` with
 > Athelas 1.8.1 and two controllers. Not tested on the Steam Deck. English is the default language of the mod's own
@@ -76,7 +76,7 @@ changes nothing on disk except the file it replaces (see *Installation*).
 
 ## Installation
 
-Download `ROTKPlus-1.4.0.zip` from [GitHub Releases](https://github.com/brig-dev/ROTKPlus/releases) or from
+Download `ROTKPlus-1.4.1.zip` from [GitHub Releases](https://github.com/brig-dev/ROTKPlus/releases) or from
 [ModDB](https://www.moddb.com/mods/rotkplus/downloads), then:
 
 1. Close the game. Make a backup copy of the game folder if you wish.
