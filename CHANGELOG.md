@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.2
+
+- Versus: **a parry no longer stops everything**. Between players a fierce attack (Triangle), the last move of a combo
+  (Orc Slayer's glowing blow, not the X before it) and a fully drawn shot land through a parry; speed attacks, plain
+  arrows and spears are parried as before. `[PvP] HeavyUnblockable=0` gives back the game's parry.
+
 ## 1.4.1
 
 - Co-op and versus: **Aragorn as third or fourth player at the Black Gate** stayed still in the rest pose (arms open,

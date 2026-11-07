@@ -15,7 +15,7 @@ changes nothing on disk except the file it replaces (see *Installation*).
 **Download:** [GitHub Releases](https://github.com/brig-dev/ROTKPlus/releases) or
 [ModDB](https://www.moddb.com/mods/rotkplus/downloads) (same file). Mod page: <https://www.moddb.com/mods/rotkplus>. What changed: [CHANGELOG.md](CHANGELOG.md)
 
-> **Status:** version 1.4.1. Tested on Windows 11 with Athelas 1.5 to 1.8.2, the Italian edition of the game, up to four
+> **Status:** version 1.4.2. Tested on Windows 11 with Athelas 1.5 to 1.8.2, the Italian edition of the game, up to four
 > controllers, keyboard and mouse (the 1.4 Versus modes with two and four players). On SteamOS (Proton): the Versus mode
 > with three players (1.0.0), the whole campaign with Athelas 1.7.x (1.2.0), and the 1.4 pages and `FastText=2` with
 > Athelas 1.8.1 and two controllers. Not tested on the Steam Deck. English is the default language of the mod's own
@@ -47,7 +47,8 @@ changes nothing on disk except the file it replaces (see *Installation*).
   the winner; a timed round tied at the end goes to **sudden death** (the next knock-down wins). After the game the map
   comes back at once, without the game's score screens, with the **Last game** over it (who won, everybody's
   knock-downs and falls). At the Black Gate with the heroes only, its boss still plays its opening scene (Frodo's
-  mithril) and then leaves before the fight.
+  mithril) and then leaves before the fight. A **parry** stops speed attacks, plain arrows and spears, but not a fierce
+  attack (Triangle), the last move of a combo (Orc Slayer's glowing blow) or a fully drawn shot.
   A sound of the level when a player hits another one and a music at the start can be set in the ini (see
   `[PvP] Cheer_<level>`, *experimental*).
 - Progress of the extra players (levels, experience, purchases) shows up in the save game under the first player's
@@ -76,7 +77,7 @@ changes nothing on disk except the file it replaces (see *Installation*).
 
 ## Installation
 
-Download `ROTKPlus-1.4.1.zip` from [GitHub Releases](https://github.com/brig-dev/ROTKPlus/releases) or from
+Download `ROTKPlus-1.4.2.zip` from [GitHub Releases](https://github.com/brig-dev/ROTKPlus/releases) or from
 [ModDB](https://www.moddb.com/mods/rotkplus/downloads), then:
 
 1. Close the game. Make a backup copy of the game folder if you wish.
@@ -193,6 +194,7 @@ respawns, the hero selection and the end-of-level screens. It is a testing aid, 
 | | `SkipScoreScreens` | after a Versus game straight to the map (1, default) or the game's score screens (0) |
 | | `BossScene` | with the heroes only, the Black Gate's boss comes for its opening scene and then goes away (1, default) |
 | | `LastGame` | after a Versus game the Last game over the map until confirm or back (1, default) |
+| | `HeavyUnblockable` | between players a parry cannot stop fierce attacks, the last moves of the combos and fully drawn shots (1, default) |
 | | `SuddenDeath` | a timed round tied at the end goes on until the next knock-down (1, default) |
 | | `Cheer_<level>`, `Music_<level>`, `CheerEvery` | audio commands of the level for hits and for the start (see the example ini) |
 | `[Players]` | `Enabled`, `TextScale`, `TableScale`, `Shade` | the Fellowship entry (names and statistics); size of its texts; the dark rectangle behind them (0 none, 1 black) |
