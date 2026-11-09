@@ -88,7 +88,8 @@ enum Txt {
     T_MP_PLAYERS, T_MP_ENEMIES, T_MP_ENEMIES_ON, T_MP_HEROES, T_MP_LIVES, T_MP_SPLIT, T_MP_SPLIT_VAL, T_MP_SUN, T_MP_MOON,
     T_MP_TEAMS_HEAD, T_MP_NOTE_MAP, T_MP_NOTE_ARENA, T_MP_HELP, T_MP_RULE, T_MP_RULE_LAST, T_MP_RULE_TIME, T_MP_TIME,
     T_MP_MINUTES, T_MP_ROUNDS, T_MP_SINGLE, T_MP_BEST, S_KICKS, S_SPEED_HITS, S_FIERCE_HITS, S_SHIELDS, T_CARD_DOWNS,
-    T_SUM_BEST_PVP, T_LAST_ENEMIES, S_VS_DOWNS, T_TO_MAP, T_CHOOSE, T_THOUSANDS, T_HERO0, T_COUNT = T_HERO0 + 9
+    T_SUM_BEST_PVP, T_LAST_ENEMIES, S_VS_DOWNS, T_TO_MAP, T_CHOOSE, T_THOUSANDS, T_MP_MORE, T_MP_ALLIES, T_MP_ASGAME,
+    T_MP_RECOMMENDED, T_MP_ALLIES_ON, T_MP_GIMLI, T_HERO0, T_COUNT = T_HERO0 + 9
 };
 struct TxtDef { const char* key; const char* en; const char* it; const char* fr; const char* de; const char* es; };
 static const TxtDef kTxt[] = {
@@ -400,6 +401,19 @@ static const TxtDef kTxt[] = {
     { "PlayersToMap", "Back to the map", "Torna alla mappa", "Retour a la carte", "Zurueck zur Karte", "Volver al mapa" },
     { "PlayersChoose", "choose your hero", "scegli l'eroe", "choisissez votre heros", "waehle deinen Helden", "elige tu heroe" },
     { "PlayersThousands", ",", ".", " ", ".", "." },   // between the thousands of a number (an ini can't hold a lone space)
+    // the campaign's more enemies and allies (Spawners.cpp, 08/11/2026)
+    { "MultiMoreEnemies", "More enemies", "Nemici in piu'", "Plus d'ennemis", "Mehr Gegner", "Mas enemigos" },
+    { "MultiMoreAllies", "More allies", "Alleati in piu'", "Plus d'allies", "Mehr Verbuendete", "Mas aliados" },
+    { "MultiAsInGame", "As in the game", "Come il gioco", "Comme le jeu", "Wie im Spiel", "Como el juego" },
+    { "MultiRecommended", "(recommended)", "(consigliato)", "(conseille)", "(empfohlen)", "(recomendado)" },
+    { "MultiAlliesOn", "As the enemies", "Come i nemici", "Comme les ennemis", "Wie die Gegner", "Como los enemigos" },
+    // under the enemies' factor when it is the highest: Gimli's line in the film, before the march on the Black Gate (in
+    // Italian as in the Italian dub, given by the owner; English in the others: their dubs' words could not be checked)
+    { "MultiGimli", "\"Certainty of death. Small chance of success. What are we waiting for?\"",
+      "\"Certezza di morte, piccole possibilita' di successo. Cosa stiamo aspettando?\"",
+      "\"Certainty of death. Small chance of success. What are we waiting for?\"",
+      "\"Certainty of death. Small chance of success. What are we waiting for?\"",
+      "\"Certainty of death. Small chance of success. What are we waiting for?\"" },
     { "HeroAragorn", "Aragorn", "Aragorn", "Aragorn", "Aragorn", "Aragorn" },
     { "HeroLegolas", "Legolas", "Legolas", "Legolas", "Legolas", "Legolas" },
     { "HeroGimli", "Gimli", "Gimli", "Gimli", "Gimli", "Gimli" },
@@ -1455,6 +1469,7 @@ static uint32_t __cdecl Effect(uint32_t name, uint32_t joint, uint32_t owner, ui
 // the end of a level: the rare script calls and all the tags, a dozen per line
 static void LogTrace()
 {
+    SupportDumpScriptRing(CoopLevelFile());
     if (!LogDetail()) return;
     std::string line;
     int k = 0;
@@ -1924,11 +1939,49 @@ static bool g_lineupDone;             // Start was confirmed: Screens.cpp runs t
 static int  g_lineupLogged;
 // the Multiplayer page (Who is playing? with the game's mode and rules on the left; below, "Multiplayer")
 enum { MP_CAMPAIGN, MP_FFA, MP_TEAMS };
-enum { MR_MODE = 10, MR_PLAYERS, MR_SPLIT, MR_ENEMIES, MR_RULE, MR_LIVES, MR_TIME, MR_ROUNDS, MR_START = 20, MR_BACK };   // its rows (0..3 the places)
+enum { MR_MODE = 10, MR_PLAYERS, MR_SPLIT, MR_ENEMIES, MR_RULE, MR_LIVES, MR_TIME, MR_ROUNDS, MR_MORE, MR_ALLIES, MR_START = 20,
+       MR_BACK };   // its rows (0..3 the places)
 static bool g_multi;                  // the line-up page is the Multiplayer page
 static int  g_mpMode, g_mpCoopN = 3, g_mpFfaN = 2, g_mpLives = 2, g_mpSplit;
 static bool g_mpEnemies = true, g_mpTimed;
 static int  g_mpMinutes = 3, g_mpRounds = 1;
+// the campaign: more enemies (tenths: 10 as in the game ... 30 three times; the recommended one follows the players) and
+// more allies (as many more as the enemies, or as in the game)
+static int  g_mpMore = 15;
+static int  g_mpAlly = 0;     // the allies: 0 as the enemies, 10 as in the game, 15 ... 50
+static int  MpRecommended(int players) { return players >= 4 ? 20 : players == 3 ? 15 : 10; }
+// the same two choices for a Single game, on Who is playing? (rows MR_MORE and MR_ALLIES under the place), kept apart
+// from the co-op ones ([Coop] SingleEnemyFactor, SingleMoreAllies): alone, as in the game unless chosen
+static int  g_spMore = 10;
+static int  g_spAlly = 0;
+// The factors offered (09/11/2026): as in the game, x1.5, x2 (the recommended ones with three and four players), x3, x5
+// and x7 (kMaxFactor); the steps of a half in between made no difference to see. The allies have "as the enemies" (0)
+// before them. A value saved before (x2.5, x4...) is taken to the nearest one (the lower when halfway).
+static const int kMoreSteps[] = { 10, 15, 20, 30, 50, kMaxFactor };
+static const int kMoreStepN = (int)(sizeof kMoreSteps / sizeof kMoreSteps[0]);
+static int SnapMore(int v)
+{
+    int best = kMoreSteps[0];
+    for (int x : kMoreSteps) if (abs(x - v) < abs(best - v)) best = x;
+    return best;
+}
+static int MoreStep(int v, int dir)
+{
+    int i = 0;
+    for (int j = 0; j < kMoreStepN; ++j) if (kMoreSteps[j] == SnapMore(v)) i = j;
+    return kMoreSteps[(i + dir + kMoreStepN) % kMoreStepN];
+}
+static int AllyStep(int v, int dir)   // 0 (as the enemies), then the factors
+{
+    const int n = kMoreStepN + 1;
+    int i = 0;
+    for (int j = 1; j < n; ++j) if (v && kMoreSteps[j - 1] == SnapMore(v)) i = j;
+    const int k = (i + dir + n) % n;
+    return k == 0 ? 0 : kMoreSteps[k - 1];
+}
+static bool GoodMore(int v) { return v >= 10 && v <= kMaxFactor && v % 5 == 0; }
+static bool SingleOptions();
+static std::string MoreText(int tenths, int recommended);
 static char g_edit[kMaxName + 1];
 static int  g_gridR, g_gridC;         // on-screen letters
 struct Totals { std::string name; Vals v; };
@@ -2096,6 +2149,12 @@ bool PlayersOpenLineup(int n)
     g_lineupN = n;
     FillLineup(0, n);
     g_multi = false;
+    if (n == 1) {
+        const int more = IniInt("Coop", "SingleEnemyFactor", 10);
+        g_spMore = GoodMore(more) ? SnapMore(more) : 10;
+        const int ally = IniInt("Coop", "SingleAllyFactor", 0);
+        g_spAlly = GoodMore(ally) ? SnapMore(ally) : 0;
+    }
     g_lineupRow = n;   // on Start
     g_lineupDone = false;
     g_lineupLogged = 0;
@@ -2134,6 +2193,10 @@ static void MpRows(int box, std::vector<int>& rows)
     if (box == 1) { for (int r = 0; r < g_lineupN; ++r) rows.push_back(r); return; }
     rows.push_back(MR_MODE);
     rows.push_back(g_mpMode == MP_TEAMS ? MR_SPLIT : MR_PLAYERS);
+    if (g_mpMode == MP_CAMPAIGN) {
+        rows.push_back(MR_MORE);
+        rows.push_back(MR_ALLIES);
+    }
     if (g_mpMode != MP_CAMPAIGN) {
         rows.push_back(MR_ENEMIES);
         rows.push_back(MR_RULE);
@@ -2178,6 +2241,7 @@ static void MpStep(int id, int dir)
     case MR_PLAYERS: {
         int& n = g_mpMode == MP_FFA ? g_mpFfaN : g_mpCoopN;
         n = Wrap(n + dir, 2, 4);
+        if (g_mpMode == MP_CAMPAIGN) g_mpMore = MpRecommended(n);   // the recommended one for the new number of players
         break;
     }
     case MR_SPLIT: g_mpSplit = Wrap(g_mpSplit + dir, 0, 2); break;
@@ -2186,6 +2250,8 @@ static void MpStep(int id, int dir)
     case MR_RULE: g_mpTimed = !g_mpTimed; break;
     case MR_TIME: g_mpMinutes = g_mpMinutes == 2 ? (dir > 0 ? 3 : 5) : g_mpMinutes == 3 ? (dir > 0 ? 5 : 2) : (dir > 0 ? 2 : 3); break;
     case MR_ROUNDS: g_mpRounds = g_mpRounds == 1 ? (dir > 0 ? 3 : 5) : g_mpRounds == 3 ? (dir > 0 ? 5 : 1) : (dir > 0 ? 1 : 3); break;
+    case MR_MORE: g_mpMore = MoreStep(g_mpMore, dir); break;
+    case MR_ALLIES: g_mpAlly = AllyStep(g_mpAlly, dir); break;
     default: return;
     }
     SetLineupN(MpPlayers());
@@ -2205,6 +2271,10 @@ static void MpLoad()
     g_mpRounds = rounds == 3 || rounds == 5 ? rounds : 1;
     const int t1 = IniInt("PvP", "Team1", 12);
     g_mpSplit = t1 == 13 ? 1 : t1 == 14 ? 2 : 0;
+    const int more = IniInt("Coop", "EnemyFactor", -1);
+    g_mpMore = GoodMore(more) ? SnapMore(more) : MpRecommended(g_mpCoopN);
+    const int ally = IniInt("Coop", "AllyFactor", 0);
+    g_mpAlly = GoodMore(ally) ? SnapMore(ally) : 0;
 }
 
 bool PlayersMultiEnabled() { return g_enabled && g_askWho && g_multiPage; }
@@ -2333,9 +2403,19 @@ static void LineupStart()
     Log("players: who is playing (%d): %s / %s / %s / %s", g_lineupN, PlayerName(0).c_str(),
         g_lineupN > 1 ? PlayerName(1).c_str() : "-", g_lineupN > 2 ? PlayerName(2).c_str() : "-",
         g_lineupN > 3 ? PlayerName(3).c_str() : "-");
+    if (SingleOptions()) {
+        IniWriteInt("Coop", "SingleEnemyFactor", g_spMore);
+        IniWriteInt("Coop", "SingleAllyFactor", g_spAlly);
+        SpawnersConfigure(true, g_spMore, g_spAlly);
+    }
     if (g_multi) {   // the Multiplayer page's own choices (the versus ones: Pvp.cpp, PvpConfigure)
         IniWriteInt("Multiplayer", "Mode", g_mpMode);
         IniWriteInt("Coop", "Players", g_mpCoopN);
+        if (g_mpMode == MP_CAMPAIGN) {
+            IniWriteInt("Coop", "EnemyFactor", g_mpMore);
+            IniWriteInt("Coop", "AllyFactor", g_mpAlly);
+            SpawnersConfigure(false, g_mpMore, g_mpAlly);
+        }
         Log("players: multiplayer: mode %d, %d players, enemies %d, %s, %d round(s), team 1 = %d", g_mpMode, MpPlayers(),
             g_mpEnemies, g_mpTimed ? (std::to_string(g_mpMinutes) + " minutes").c_str() : (std::to_string(g_mpLives) + " lives").c_str(),
             g_mpRounds, kSplitTeam1[g_mpSplit]);
@@ -2364,10 +2444,20 @@ static void LineupAction(int action, int slot)
         if (slot < g_lineupN && (action == 4 || action == 5)) LineupCycle(slot, action == 4 ? 1 : -1);
         return;
     }
-    const int rows = g_lineupN + 2;
-    if (action == 0) g_lineupRow = (g_lineupRow + rows - 1) % rows;
-    else if (action == 2) g_lineupRow = (g_lineupRow + 1) % rows;
+    // the rows in order: the places, a Single game's two choices, Start, Back
+    int order[8], n = 0, at = 0;
+    for (int r = 0; r < g_lineupN; ++r) order[n++] = r;
+    if (SingleOptions()) { order[n++] = MR_MORE; order[n++] = MR_ALLIES; }
+    order[n++] = g_lineupN;
+    order[n++] = g_lineupN + 1;
+    for (int i = 0; i < n; ++i) if (order[i] == g_lineupRow) at = i;
+    if (action == 0) g_lineupRow = order[(at + n - 1) % n];
+    else if (action == 2) g_lineupRow = order[(at + 1) % n];
     else if ((action == 4 || action == 5) && g_lineupRow < g_lineupN) LineupCycle(g_lineupRow, action == 4 ? 1 : -1);
+    else if ((action == 4 || action == 5) && g_lineupRow == MR_MORE) g_spMore = MoreStep(g_spMore, action == 4 ? 1 : -1);
+    else if ((action == 4 || action == 5) && g_lineupRow == MR_ALLIES) g_spAlly = AllyStep(g_spAlly, action == 4 ? 1 : -1);
+    else if (action == 7 && g_lineupRow == MR_ALLIES) g_spAlly = AllyStep(g_spAlly, 1);
+    else if (action == 7 && g_lineupRow == MR_MORE) g_spMore = MoreStep(g_spMore, 1);
     else if (action == 7) {
         if (g_lineupRow < g_lineupN) {
             if (g_lineup[g_lineupRow] == kNewName) BeginEditLineup(g_lineupRow);
@@ -3052,6 +3142,14 @@ static void Put(const std::string& text, float x, float y, float scale, int styl
     DrawGameElement(g_txt);
 }
 
+// Gimli's line when the enemies are at the highest factor: a quotation, centred under the page above the line of the
+// buttons, on one row (in the box it was squeezed in rows: 09/11/2026); no name under it: everybody knows it
+static void PutGimli()
+{
+    const std::string t = Txt(T_MP_GIMLI);
+    Put(t, 0.5f, 0.83f, g_tableScale * 0.85f, ST_SEL, 2, 0.86f);
+}
+
 static void Text(const std::string& s, float x, float y, float scale, bool hi) { Put(s, x, y, scale, hi ? ST_SEL : ST_VALUE); }
 static void Title(const std::string& s) { Put(s, 0.5f, 0.07f, g_scale * 1.1f, ST_TITLE, 2, 0.9f); }
 
@@ -3623,6 +3721,8 @@ static void DrawMulti()
         case MR_LIVES: label = T_MP_LIVES; value = std::to_string(g_mpLives); break;
         case MR_RULE: label = T_MP_RULE; value = Txt(g_mpTimed ? T_MP_RULE_TIME : T_MP_RULE_LAST); break;
         case MR_TIME: label = T_MP_TIME; value = Replace(Txt(T_MP_MINUTES), "{n}", std::to_string(g_mpMinutes)); break;
+        case MR_MORE: label = T_MP_MORE; value = MoreText(g_mpMore, MpRecommended(MpPlayers())); break;
+        case MR_ALLIES: label = T_MP_ALLIES; value = g_mpAlly == 0 ? Txt(T_MP_ALLIES_ON) : MoreText(g_mpAlly, -1); break;
         case MR_ROUNDS:
             label = T_MP_ROUNDS;
             value = g_mpRounds == 1 ? Txt(T_MP_SINGLE) : Replace(Txt(T_MP_BEST), "{n}", std::to_string(g_mpRounds));
@@ -3651,8 +3751,12 @@ static void DrawMulti()
             Put(LangText(9, 0, names.c_str(), LangText(11 + t).c_str()), lx + 0.03f, y + 0.045f + t * 0.05f,
                 g_tableScale * 0.85f, t == 0 ? ST_SEL : ST_MOON, 0, lr - lx - 0.05f);
         }
-    } else Put(Txt(g_mpMode == MP_FFA ? T_MP_NOTE_ARENA : T_MP_NOTE_MAP), lx + 0.03f, y, g_tableScale * 0.8f, ST_HELP, 0,
-               lr - lx - 0.05f);
+    } else {
+        Put(Txt(g_mpMode == MP_FFA ? T_MP_NOTE_ARENA : T_MP_NOTE_MAP), lx + 0.03f, y, g_tableScale * 0.8f, ST_HELP, 0,
+            lr - lx - 0.05f);
+        if (g_mpMode == MP_CAMPAIGN && g_mpMore >= kMaxFactor)   // the highest factor: Gimli
+            PutGimli();
+    }
     // who plays
     Heading(Txt(T_SEC_WHO), rx + 0.02f, top + 0.02f, rr - 0.02f);
     y = top + 0.075f;
@@ -3682,6 +3786,21 @@ static void DrawMulti()
 
 // Who is playing? in the same style (02/11/2026): the places of the game about to start, then Start and Back; on the
 // right the selected player (or, on Start, the whole line-up); the help line at the bottom.
+static bool SingleOptions() { return !g_multi && g_lineupN == 1; }
+
+// "As in the game", "x1.5"... and "(recommended)" after the recommended one
+static std::string MoreText(int tenths, int recommended)
+{
+    std::string v;
+    if (tenths == 10) v = Txt(T_MP_ASGAME);
+    else {
+        v = "x" + std::to_string(tenths / 10);
+        if (tenths % 10) v += (Txt(T_THOUSANDS) == "," ? "." : ",") + std::to_string(tenths % 10);
+    }
+    if (tenths == recommended) v += " " + Txt(T_MP_RECOMMENDED);
+    return v;
+}
+
 static void DrawLineup()
 {
     if (g_multi) { DrawMulti(); return; }
@@ -3692,7 +3811,30 @@ static void DrawLineup()
         if (g_lineupRow == r) SelBox(x0, y, right, rowH);
         DrawPlace(r, ex, y, rowH, right, g_lineupRow == r, g_playerLabel[r], g_lineup[r]);
     }
-    const float y0 = 0.205f + g_lineupN * rowH + 0.04f;
+    float y0 = 0.205f + g_lineupN * rowH + 0.04f;
+    if (SingleOptions()) {   // a Single game's two choices
+        for (int id : { (int)MR_MORE, (int)MR_ALLIES }) {
+            const bool sel = g_lineupRow == id;
+            // (no "(recommended)" here: alone it is "As in the game", and the two words don't fit after it)
+            const std::string value = id == MR_MORE ? MoreText(g_spMore, -1)
+                                                    : g_spAlly == 0 ? Txt(T_MP_ALLIES_ON) : MoreText(g_spAlly, -1);
+            if (sel) SelBox(x0, y0, right, rowH);
+            Put(Txt(id == MR_MORE ? T_MP_MORE : T_MP_ALLIES), ex, y0, ts, sel ? ST_SEL : ST_VALUE, 0, 0.215f);
+            const float ah = 0.03f, aw = ah * 0.48f, ax = ex + 0.222f + 0.033f, nx = ax + aw + 0.008f;
+            const float maxW = right - 0.012f - aw - 0.008f - nx, nw = (std::min)(TextWidth(ST_VALUE, value, ts), maxW);
+            Arrow(ax, y0 + 0.006f, ah, false, sel ? ST_SEL : ST_VALUE);
+            Put(value, nx, y0, ts, sel ? ST_SEL : ST_VALUE, 0, maxW);
+            Arrow(nx + nw + 0.008f, y0 + 0.006f, ah, true, sel ? ST_SEL : ST_VALUE);
+            AddHit(ax - 0.012f, y0 - 0.006f, ax + aw + 0.006f, y0 + rowH - 0.006f, H_LEFT, id);
+            AddHit(nx + nw + 0.002f, y0 - 0.006f, nx + nw + 0.03f, y0 + rowH - 0.006f, H_RIGHT, id);
+            AddHit(x0 - 0.02f, y0 - 0.006f, right, y0 + rowH - 0.006f, H_SELECT, id);
+            y0 += rowH;
+        }
+        if (g_spMore >= kMaxFactor) {   // the highest factor: Gimli
+            PutGimli();
+        }
+        y0 += 0.02f;
+    }
     for (int e = 0; e < 2; ++e) {
         const int row = g_lineupN + e;
         const float y = y0 + e * rowH;

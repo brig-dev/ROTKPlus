@@ -18,3 +18,7 @@ Debug/
 ROTKPlus.log
 # the Athelas mod built by build.sh
 /ROTKPlus.dll
+# the launcher and ROTK Fix built by launcher/build_win.sh
+launcher/build/
+launcher/launcher/build/
+launcher/tools/wrap/

@@ -1005,8 +1005,16 @@ static void DrawElementHud(uint32_t e)
 static bool g_hudOn;
 void ScreensSawElement(uint32_t e);   // Screens.cpp: where the main menu's entries are drawn
 
+// HUD elements the game asked to draw (09/11/2026: with ~160 characters the HUD and the pause menu vanish; the
+// count, in the log every 10 s with the characters, tells whether the game stops asking or its drawing is lost)
+static volatile long g_hudDraws;
+void DrawsSample();
+long HudDrawsTaken() { const long n = g_hudDraws; g_hudDraws = 0; return n; }
+
 static void __cdecl DrawElement(uint32_t e)
 {
+    ++g_hudDraws;
+    DrawsSample();   // Spawners.cpp: how full the renderer's queue is while it is being drawn
     ScreensSawElement(e);
     if (g_hudOn) DrawElementHud(e);
     else if (e) DrawMark(e);

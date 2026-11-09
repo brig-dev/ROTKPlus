@@ -1,0 +1,22 @@
+ROTKPlus in your Steam library
+==============================
+
+Add ROTKPlus to Steam as a non-Steam game, then give it these pictures, so that it looks like any other game in the
+library (on a PC, a Steam Deck or another SteamOS device).
+
+1. Steam > Games > Add a Non-Steam Game to My Library... > Browse... > choose ROTKPlus.exe (this folder's parent).
+   On a Steam Deck or another SteamOS device do this in Desktop Mode, then set Properties > Compatibility to a recent Proton.
+
+2. The pictures, in the library (Desktop Mode on SteamOS):
+   - capsule_600x900.png  the cover: right-click ROTKPlus > Manage > Set custom artwork
+   - hero_1920x620.png    the background at the top of its page: right-click that background > Set Custom Background
+   - logo.png             the emblem over it: right-click the background > Set Custom Logo
+                          (Adjust Logo Position puts it where you like; on the left it sits on the dark part)
+   - wide_920x430.png     the wide cover (recent games, Big Picture): right-click ROTKPlus > Manage >
+                          Set custom artwork, while the library shows wide covers
+   - icon_256.png         the icon: right-click ROTKPlus > Properties > the empty square next to its name
+
+3. Controller: Properties > Controller > "Gamepad" (or Steam Input off), so that each controller is a gamepad for
+   ROTKPlus and the game.
+
+The pictures are ROTKPlus' own art; the game's name is only written on them.

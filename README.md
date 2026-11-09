@@ -6,23 +6,44 @@ Co-op with **3 and 4 players** and a **player-versus-player mode** for
 The game ships with a 2-player co-op. ROTKPlus adds a third and a fourth hero to the same level, each with its own
 controller, HUD box, mark above the head, shared lives, level-up, and turn in the end-of-level screens. It also adds a
 **Versus** mode for 2 to 4 players (everybody against everybody or 2 vs 2, timed games, tournaments) and names and
-statistics for every player. Everything starts from one **Multiplayer** entry in the main menu.
+statistics for every player. Everything starts from one **Multiplayer** entry in the main menu. From 1.5 the campaign
+can also have **more enemies and more allies** (from x1.5 to x7), for battles as big as the films.
 
-ROTKPlus is a small DLL, not a replacement for the game. It works together with
-[ROTK Fix / Athelas](https://github.com/Shagg88/Athelas) by Shagg88 (which makes the game run on modern PCs), and it
-changes nothing on disk except the file it replaces (see *Installation*).
+From 1.5 ROTKPlus comes in one download with everything: the **ROTKPlus launcher**, ROTK Fix (widescreen, a modern
+renderer, controllers, 3D audio) and the mod. The launcher has the Fellowship with each player's statistics and deeds, a
+card to share as a picture, the screenshots, a controller and the buttons for each of the four players, and every page
+usable with a controller. The mod alone is still there for Athelas (see *Installation*).
 
 **Download:** [GitHub Releases](https://github.com/brig-dev/ROTKPlus/releases) or
-[ModDB](https://www.moddb.com/mods/rotkplus/downloads) (same file). Mod page: <https://www.moddb.com/mods/rotkplus>. What changed: [CHANGELOG.md](CHANGELOG.md)
+[ModDB](https://www.moddb.com/mods/rotkplus/downloads) (same files). Mod page: <https://www.moddb.com/mods/rotkplus>. What changed: [CHANGELOG.md](CHANGELOG.md)
 
-> **Status:** version 1.4.2. Tested on Windows 11 with Athelas 1.5 to 1.8.2, the Italian edition of the game, up to four
-> controllers, keyboard and mouse (the 1.4 Versus modes with two and four players). On SteamOS (Proton): the Versus mode
-> with three players (1.0.0), the whole campaign with Athelas 1.7.x (1.2.0), and the 1.4 pages and `FastText=2` with
-> Athelas 1.8.1 and two controllers. Not tested on the Steam Deck. English is the default language of the mod's own
-> texts; Italian was verified in the game; French, German and Spanish are untested translations (see *Language*).
+> **Status:** version 1.5.0. Tested on Windows 11 with the ROTKPlus launcher and with Athelas 1.5 to 1.8.2, the Italian
+> edition of the game, up to four controllers, keyboard and mouse: the campaign with four players and more enemies up to
+> x7 (Minas Tirith, Pelennor Fields), the Versus modes with two and four players. On SteamOS (Proton): the Versus mode
+> with three players (1.0.0), the whole campaign with Athelas 1.7.x (1.2.0), the 1.4 pages and `FastText=2` with Athelas
+> 1.8.1, and a test build of the ROTKPlus launcher. Not tested on the Steam Deck. English is the default language
+> of the mod's own texts; Italian was verified in the game; French, German and Spanish are untested translations (see
+> *Language*). The launcher speaks ten languages.
+
+## ROTKPlus and Athelas
+
+ROTKPlus exists thanks to [Athelas and ROTK Fix](https://github.com/Shagg88/Athelas) by **Shagg** (MIT licence; while
+that page is down, Athelas is at [SourceForge](https://sourceforge.net/projects/athelas/)), which make the game run on
+modern PCs. The ROTKPlus launcher is Athelas' launcher made for this one game: the ROTKPlus settings in place of the Mods
+tab, nothing of the other games, and the pages of ROTKPlus (Fellowship, History, screenshots). It exists because
+ROTKPlus needed a launcher for The Return of the King only, with four players; it does not replace Athelas, which
+also runs The Two Towers, The Fellowship of the Ring and The Third Age. If you use Athelas, keep using it: ROTKPlus is
+also a mod of Athelas (from Athelas 1.8.1), and the mod alone is in every release. The launcher's sources are in
+[`launcher`](launcher), with Shagg's copyright kept as the licence asks.
 
 ## Features
 
+- **More enemies and allies** in the campaign, chosen on the Multiplayer page: as in the game, x1.5, x2, x3, x5 or x7
+  (with a line of Gimli's), recommended x1.5 with three players and x2 with four; the allies as many more as the
+  enemies or a factor of their own; the same for a single player on *Who is playing?*. The levels' common enemies
+  (soldiers, shields, archers) come out of their spawners more times and the level scripts count them as their own, so
+  the waves end as before; captains, trolls, mumakil, spiders, bosses and story characters stay as they are. At the
+  Top of the Wall the level is lost when too many orcs are on the wall: a high factor gets there soon.
 - Main menu: **Multiplayer**, with a page where the mode (campaign, everybody against everybody, teams), the number of
   players, the enemies, the lives, the teams and who plays are chosen together (see *Using it*).
 - Third and fourth player in the same level: they pick their hero after players 1 and 2 in the selection screen, are
@@ -30,7 +51,11 @@ changes nothing on disk except the file it replaces (see *Installation*).
   above their head, a respawn countdown, level-up effects, kills and experience.
 - Lives are shared as in the original game (two with two players) and grow by one per extra player; the game is lost
   only when everybody is down.
-- The camera frames the whole group, and a player who gets stuck outside the frame is brought back to a teammate.
+- The camera frames the whole group (players 1 and 2 only during the level's scenes, which the scripts drive for them).
+  A player stuck outside the frame or running in place against a wall is brought back to a teammate, the third and
+  fourth player left far behind players 1 and 2 are brought next to them, and they come along when the level moves
+  players 1 and 2 to another place. Players 3 and 4 can also press **Back** (View, Create) to come back next to player
+  1 or 2 at any time.
 - End-of-level screens (score, co-op statistics, shop) give each extra player a turn, controlled by that player's own
   controller only.
 - Versus mode: melee hits, combos, specials, the R2 / RT execution (half of the victim's life), arrows with lock-on, the
@@ -70,15 +95,33 @@ changes nothing on disk except the file it replaces (see *Installation*).
 
 - The game, in the version that Athelas calls "Game v1.0" (`rotk.exe` of 1,703,936 bytes). Other
   executables are detected and ROTKPlus does nothing.
-- [Athelas](https://github.com/Shagg88/Athelas) with ROTK Fix set up for the game (it provides `SDL3.dll`, the
-  controller layer and the graphics fix). Tested with Athelas 1.5 to 1.8.1.
+- The ROTKPlus launcher (in the package), or [Athelas](https://github.com/Shagg88/Athelas) 1.5 to 1.8.2 with ROTK Fix
+  set up for the game. Either one provides `SDL3.dll`, the controller layer and the graphics fix.
 - One controller per player (Xbox-style, PlayStation, anything SDL3 supports). Without a controller an extra player
   stands still (or, with `KeyboardFallback=1`, moves with player 1's keys).
 
 ## Installation
 
-Download `ROTKPlus-1.4.2.zip` from [GitHub Releases](https://github.com/brig-dev/ROTKPlus/releases) or from
-[ModDB](https://www.moddb.com/mods/rotkplus/downloads), then:
+Every release has two files, on [GitHub Releases](https://github.com/brig-dev/ROTKPlus/releases) and on
+[ModDB](https://www.moddb.com/mods/rotkplus/downloads).
+
+**`ROTKPlus-Pack-1.5.0.zip`, everything in one (recommended):**
+
+1. Install the game (version 1.0) in a folder of its own, for example `C:\Games\ROTK`.
+2. Unzip the package in another folder, for example `C:\Games\ROTKPlus` (never inside the game's folder).
+3. Start `ROTKPlus.exe`, choose the game's folder (the launcher looks for it by itself and offers what it finds), and
+   press Play: the first Play puts ROTK Fix and ROTKPlus in the game's folder, next to `rotk.exe`. The game's own files
+   are not changed.
+4. Settings: the launcher's tabs (ROTKPlus' own on the Gameplay tab) and, in the game, the Multiplayer page. The
+   launcher tells when a new version is out.
+
+Steam Deck and SteamOS: add `ROTKPlus.exe` to Steam as a non-Steam game, with a recent Proton; the package's `steam`
+folder has pictures for the library and how to set them.
+
+**`ROTKPlus-1.5.0-mod.zip`, the mod alone, for Athelas:** copy `ROTKPlus.dll` and `ROTKPlus.ini` from its `athelas_mod`
+folder into `ROTKFix\mods\` in the game folder and turn ROTKPlus on in Athelas' Mods tab.
+
+**The classic way** (`DivxMediaLib.dll`, in the same mod zip, for any setup with ROTK Fix):
 
 1. Close the game. Make a backup copy of the game folder if you wish.
 2. In the game folder, rename `DivxMediaLib.dll` to `DivxMediaLib_orig.dll`.
@@ -93,9 +136,9 @@ Download `ROTKPlus-1.4.2.zip` from [GitHub Releases](https://github.com/brig-dev
 
 To remove it, delete ROTKPlus's `DivxMediaLib.dll` and rename `DivxMediaLib_orig.dll` back.
 
-ROTKPlus also comes as a mod of Athelas (from Athelas 1.8.1, which has ROTKPlus 1.3.0): turn it on in the launcher's
-**Mods** tab instead of copying `DivxMediaLib.dll`. Use one of the two ways, not both (with both, only one changes the
-game, and the log says which).
+Use one way only (with both the `DivxMediaLib.dll` and the mod, only one changes the game, and the log says which).
+Moving to the package from the classic way: delete ROTKPlus's `DivxMediaLib.dll` and rename `DivxMediaLib_orig.dll`
+back; your `ROTKPlus.ini` and statistics stay.
 
 ## Logs
 
@@ -170,10 +213,15 @@ Athelas with no controller connected. The keys work only while the game window h
 | 3 | I J K L | U | O | P | Y | H |
 | 4 | numpad 8 4 5 6 (Num Lock on) | Num 0 | Num . | Num 1 | Num 2 | Num 3 |
 
+In a level, N (player 3) and Num 9 (player 4) are their controller's Back: back next to player 1 or 2.
 In the menus (hero selection, score, statistics, shop) the keys of player 1 also work for whoever's turn it is, players 2,
 3 and 4 included: W A S D to move, Enter or Space to confirm, Escape or Backspace to go back.
 One person can drive one character at a time, which is enough to look at the creation of the players, the HUD, deaths and
 respawns, the hero selection and the end-of-level screens. It is a testing aid, not a way to play.
+
+With `[Debug] SimPads=3` one controller drives all four players instead: in the levels players 2, 3 and 4 copy every
+move of player 1 (Start and Select excepted), in the menus player 1's controller serves whoever's turn it is. Four heroes
+on screen with one person at the controller, for videos and tests; not a way to play either.
 
 ## Configuration
 
@@ -186,6 +234,10 @@ respawns, the hero selection and the end-of-level screens. It is a testing aid, 
 | | `Hero` | hero of the third player if not chosen (`auto`, `aragorn`, ...) |
 | | `Pad`, `PadName` | use controllers for the extra players; pick the third one by part of its name |
 | | `Hud`, `HudX`, `HudY`, `HudRow`, `HudScale` | position and size of the extra HUD boxes |
+| | `MoreEnemies`, `EnemyFactor`, `AllyFactor` | more enemies and allies in the co-op campaign, in tenths (10 ... 70; -1 recommended, 0 allies as the enemies) |
+| | `SingleEnemyFactor`, `SingleAllyFactor`, `MoreEnemiesMaxAlive` | the same for a single player; at most this many alive at once from one spawner (16) |
+| | `Unstick`, `FollowTeleports` | bring back stuck or far players (1); the third and fourth follow the level's moves of players 1 and 2 (1) |
+| | `MoreDraws` | room for 8192 items in the renderer's queue (1, default; with many enemies the HUD flickered) |
 | `[PvP]` | `Enabled`, `Players`, `Lives` | the Versus modes, their number of players, lives per player |
 | | `Teams`, `Enemies`, `Team1` | 2 vs 2 and heroes only (also changed from the menu); the two players of team 1 (`12`, `13`, `14`) |
 | | `ArenasOnly` | the map offers only the three arenas in Versus games (1, default) |
@@ -237,6 +289,9 @@ The same sources build two ways:
   launcher's Mods tab; ROTK Fix starts it (`ModInit`). Settings, statistics and logs stay in the game folder. If the
   `DivxMediaLib.dll` install is there too, only one of the two changes the game and the log says which.
 
+- **The ROTKPlus launcher** and its ROTK Fix: see [`launcher/BUILDING.md`](launcher/BUILDING.md) (32-bit mingw-w64 g++,
+  SDL3).
+
 The inline assembly is written once for both compilers (`ASM(...)` lines, see `src/ROTKPlus.h`), and the reads of game
 objects that may be gone go through `Guard` (`src/Guard.cpp`). The `src` folder has one file per area; the top of each
 file explains what it patches and why.
@@ -270,8 +325,11 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for how.
 
 - Created by **brig-dev**, with the help of Claude (Anthropic) for the analysis and the code. The work consisted of
   reverse engineering the 2003 executable, writing the patches, and testing every feature in the game.
-- Built to run with [Athelas and ROTK Fix](https://github.com/Shagg88/Athelas) by Shagg88 (MIT). ROTKPlus does not
-  include or modify any of their files, and was not made or endorsed by them.
+- The ROTKPlus launcher and ROTK Fix are [Athelas and ROTK Fix](https://github.com/Shagg88/Athelas) by **Shagg** (MIT;
+  also at [SourceForge](https://sourceforge.net/projects/athelas/)), with our changes; his copyright notice is in
+  [`launcher/LICENSE`](launcher/LICENSE). The mod itself includes none of their files. ROTKPlus was not made or endorsed
+  by Shagg. DXVK, SDL3, Dear ImGui, miniz, OpenAL Soft, DSOAL and the fonts keep their own licences
+  ([`launcher/licenses`](launcher/licenses)).
 - *The Lord of the Rings: The Return of the King* is a trademark and a work of its respective owners (Electronic Arts,
   New Line Cinema, Warner Bros., the Tolkien Estate and others). ROTKPlus is an unofficial fan project, not affiliated
   with or endorsed by any of them. It contains no game code, data, art or sound; you need your own copy of the game.

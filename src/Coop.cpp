@@ -193,9 +193,15 @@ static bool DropAlly(PackageList* list)
     return false;
 }
 
+static char g_levelFile[64];   // the level being loaded ("min00"), "" for the menu
+const char* CoopLevelFile() { return g_levelFile; }
+
+static void RecallNewLevel();   // below, with the recalls
+
 static int __cdecl LoadPackages(PackageList* list)
 {
     g_hero[2] = g_hero[3] = -1;
+    RecallNewLevel();
     HudNewLevel();
     AudioNewLevel();
     // game levels only: the list contains the char_ packages of the two players (the menu, which is also a level
@@ -234,6 +240,7 @@ static int __cdecl LoadPackages(PackageList* list)
         }
     }
     g_livesExtra = (g_hero[2] >= 0) + (g_hero[3] >= 0);
+    g_levelFile[0] = 0;
     if (chars >= 1 && list->count >= 1) {   // statistics of the players (Players.cpp): a game level, not the menu
         // the level is the last package: "Data/Game/Min/Min02.scw" -> "min02"
         char code[64];
@@ -241,6 +248,7 @@ static int __cdecl LoadPackages(PackageList* list)
         strcpy_s(code, name ? name + 1 : list->path[list->count - 1]);
         if (char* dot = strchr(code, '.')) *dot = 0;
         _strlwr_s(code);
+        strcpy_s(g_levelFile, code);
         PlayersLevelStart(code);
     }
     return ((int(__cdecl*)(PackageList*))kLoadPackages)(list);
@@ -289,6 +297,12 @@ static void __cdecl EndSpawn(int k)
         // at 0x579188 (next one at +0x60) with that value. If an extra player has player 2's, the events of its
         // animations (e.g. 0x25D, spear release, from 0x45DAD0) reach player 2: Gimli did the throw but the spear
         // stayed in his hand. A free value is chosen.
+        // Not the highest in use plus one (until 09/11/2026): the level's own objects are numbered from its data (up to
+        // 3694 at the Southern Gate) and some are made after the players. At the Pelennor, the Paths of the Dead and the
+        // Black Gate the players are the first entities, so the extra players got 3 and 4, numbers the level gives to its
+        // objects soon after: the scripts' messages to those objects went to the extra players. kExtraKey is above any
+        // number a level uses.
+        const int kExtraKey = 0x7F00;
         int* keyN = (int*)(g_players[slot] + 0x74);
         Log("co-op: message keys %d %d %d", g_players[0] ? *(int*)(g_players[0] + 0x74) : -1,
             *(int*)(g_players[1] + 0x74), *keyN);
@@ -303,7 +317,7 @@ static void __cdecl EndSpawn(int k)
             Log("co-op: entity list unreadable");
             same = 0;
         }
-        if (same) { *keyN = maxKey + 1; Log("co-op: key of player %d shared with %d entities, changed to %d", slot + 1, same, *keyN); }
+        if (same) { *keyN = maxKey >= kExtraKey ? maxKey + 1 : kExtraKey + slot; Log("co-op: key of player %d shared with %d entities, changed to %d", slot + 1, same, *keyN); }
     }
     // Zero the extra player's per-level statistics: the game does it for players 1 and 2 when a level starts, not for
     // the others (a third player could start a level with the kills and experience of the previous one). In-game
@@ -412,13 +426,16 @@ static char __cdecl InitInputP2P3(unsigned player, char first)
 
 // --- game functions that deal with "player 1 and player 2" -----------------------------
 // Rewritten for every player present (slots 0..3 of the moved array).
-// 0x445960(lock): field +0x81C of each player = !lock (controls enabled). The game calls it around movies: without
-// this the third player stayed with its controls locked (actions worked, movement did not).
-static void __cdecl SetControlsAll(char lock)
+// 0x445960(enable): field +0x81C of each player = !enable, that is 1 while the controls are locked (0x4414DB zeroes the
+// character's speed when it is 1; 0x488BF1 calls 0x445960(1) to give the controls back, 0x489894 calls it with 0; a new
+// character starts at 0, 0x4430E4). The game calls it around movies and the level's scenes: without this the third
+// player stayed with its controls locked (actions worked, movement did not).
+static void __cdecl SetControlsAll(char enable)
 {
     for (int i = 0; i < 4; ++i)
-        if (uint8_t* c = (uint8_t*)g_players[i]) c[0x81C] = lock == 0;
+        if (uint8_t* c = (uint8_t*)g_players[i]) c[0x81C] = enable == 0;
 }
+static bool Locked(const uint8_t* c) { return c[0x81C] != 0; }
 
 // 0x488C60 / 0x488C20: freeze and unfreeze the players (bit 1 of +0x8C) with a counter at 0x5C078C.
 static void __cdecl FreezeAll()
@@ -447,6 +464,8 @@ static const uintptr_t kFocusPoint = 0x4402C0;   // void __cdecl(character, floa
 static const uintptr_t kFramePair  = 0x46F530;   // registers: edx = point A, ecx = point B, eax, esi
 
 static void RecallStragglers();
+static void FollowLevelTeleports();
+static void KeepLastPositions();
 
 static bool g_camera = true;   // [Coop] Camera: 0 = the game's own framing of players 1 and 2 (to compare, e.g. the music)
 
@@ -455,7 +474,26 @@ static void __cdecl AdjustCameraFocus() ASM_NAME(AdjustCameraFocus);
 static void __cdecl AdjustCameraFocus()
 {
     if (!g_players[2] || !g_camera) return;
+    FollowLevelTeleports();
     RecallStragglers();
+    KeepLastPositions();
+    // A scene of the level (player 1's controls locked: +0x81C = 1): the game's own framing of players 1 and 2. The level
+    // walks them where it wants (Pelennor Fields, the hill when the oliphants come) and waits for them to get there; a
+    // frame that also held the third and fourth kept them at its edge and the scene never went on (PC tests, 09/11/2026).
+    // (Until the evening of 09/11 the field was read the other way round: the camera framed only players 1 and 2 while
+    // playing, and the third and fourth player went out of the picture, at Minas Tirith and at Pelennor Fields.)
+    {
+        static int sceneWas = -1;
+        const uint8_t* p1 = (const uint8_t*)g_players[0];
+        const int scene = p1 && Locked(p1) ? 1 : 0;
+        if (scene != sceneWas) {
+            static int told;
+            if (told++ < 40) Log("co-op: %s", scene ? "a scene of the level (controls locked): the camera frames players 1 and 2 only"
+                                                    : "controls back: the camera frames everybody");
+            sceneWas = scene;
+        }
+        if (scene) return;
+    }
     float* a = (float*)0x5A5BA0;
     float* b = (float*)0x5A5B90;
     float pts[4][4];
@@ -505,9 +543,27 @@ static NAKED void FramePairStub()
 // (from the co-op camera) and writes the position (+0x30) and the previous position (+0x6E0) from which the game
 // derives the next step.
 static const uintptr_t kViewEdge = 0x43DCB0;   // uint __cdecl(character, float vel[3])
+// Second rule (08/11/2026, players stuck against a wall or a step while the others go on): a player who has been
+// walking or running (states 1 and 2) without moving more than 0.3 for 1.5 s, with the nearest teammate farther than 4
+// units, is brought next to that teammate too, frame edge or not ([Coop] Unstick=1). Not in Versus games.
+// Since 09/11/2026 (Pelennor with four players on SteamOS: player 2 at a ballista was taken away from it three
+// times in ten seconds, and each time the level put it back, until the level was stuck) only a player who is trying to
+// move is brought back, under both rules: walking or running for 1.5 s without getting anywhere. Someone standing still
+// (at a ballista, waiting, in a scene of the level) is left where it is, and so is everyone while the controls are
+// locked (movies, the level's scenes: +0x81C = 1). A player the level keeps putting back (a second recall within 10 s)
+// is left alone for 30 s. Two players stuck together are brought to one that is not stuck, not one next to the other.
+static bool  g_unstick = true;                  // [Coop] Unstick
+static DWORD g_runSince[4];                     // since when it has been walking or running (0 = it is not)
 static DWORD g_edgeAt[4];                       // last time an edge was touched
 static DWORD g_stillSince[4];                   // since when it has not moved
 static float g_stillPos[4][3];
+static DWORD g_recalledAt[4];                   // last recall
+static DWORD g_holdUntil[4];                    // no recall before this time (the level holds the player there)
+// Third rule (09/11/2026, Pelennor Fields with four players: Faramir caught somewhere below and Gimli left at the foot of
+// the hill the level had moved the others to; the camera widened to keep them, so they touched no edge, and they did not
+// "run in place"): the third or fourth player farther than 15 units from both players 1 and 2 for 4 s, outside the
+// level's scenes and the Versus games, is brought next to the nearer of the two.
+static DWORD g_farSince[4];
 
 static uint32_t __cdecl ViewEdge(uint8_t* c, float* vel)
 {
@@ -517,36 +573,175 @@ static uint32_t __cdecl ViewEdge(uint8_t* c, float* vel)
     return r;
 }
 
+// moves a character next to another one, like the game's own teleport (event 0x47 at 0x442690..): position at +0x30,
+// +0x40, +0x6C0 and +0x6E0, then event 0x62 to the character (0x401780), which realigns it
+static void MoveNextTo(uint8_t* c, const uint8_t* to, float dx, float dz)
+{
+    const float* q = (const float*)(to + 0x30);
+    const float at[3] = { q[0] + dx, q[1] + 0.5f, q[2] + dz };
+    for (int off : { 0x30, 0x40, 0x6C0, 0x6E0 }) memcpy(c + off, at, sizeof at);
+    ((void(__cdecl*)(void*, int, int, int, int))0x401780)(c, 0x62, 0, 0, 0);
+}
+
+static float Dist2(const uint8_t* u, const uint8_t* v)
+{
+    const float* p = (const float*)(u + 0x30);
+    const float* q = (const float*)(v + 0x30);
+    return (p[0] - q[0]) * (p[0] - q[0]) + (p[2] - q[2]) * (p[2] - q[2]);
+}
+
+// Fourth way (09/11/2026, Minas Tirith with four players): the third or fourth player presses Back (View on an Xbox
+// controller, Create on a DualSense; Start stays the pause) and is brought next to the nearer of players 1 and 2, the two
+// the level's scripts follow. Not in Versus games, not while dead or waiting, not while the controls are locked. Pads.cpp
+// and Sim.cpp call CoopAskBack from the input update; the move is done here, from the camera, like the other recalls.
+static DWORD g_askAt[4];
+void CoopAskBack(int slot) { if (slot >= 2 && slot < 4) g_askAt[slot] = GetTickCount(); }
+
+static void AnswerAskBack(DWORD now)
+{
+    for (int idx = 2; idx < 4; ++idx) {
+        if (!g_askAt[idx]) continue;
+        const bool fresh = now - g_askAt[idx] < 500;
+        g_askAt[idx] = 0;
+        uint8_t* c = (uint8_t*)g_players[idx];
+        if (!fresh || !c || c[0x810] || Locked(c) || PvpActive()) continue;
+        const uint8_t* lead = nullptr; float d = 1e30f; int to = 0;
+        for (int i = 0; i < 4; ++i) {   // players 1 and 2 first; anybody else only if both are out
+            const uint8_t* o = (const uint8_t*)g_players[i];
+            if (i == idx || !o || o[0x810]) continue;
+            const float di = Dist2(c, o) + (i >= 2 ? 1e20f : 0.0f);
+            if (di < d) { d = di; lead = o; to = i + 1; }
+        }
+        if (!lead) continue;
+        MoveNextTo(c, lead, idx == 2 ? -1.0f : 1.0f, 1.0f);
+        g_farSince[idx] = 0; g_stillSince[idx] = 0; g_runSince[idx] = 0; g_edgeAt[idx] = 0;
+        Log("co-op: player %d pressed Back, brought next to player %d", idx + 1, to);
+    }
+}
+
 static void RecallStragglers()
 {
     const DWORD now = GetTickCount();
+    AnswerAskBack(now);
+    bool stuck[4] = {}, edge[4] = {};
     for (int idx = 0; idx < 4; ++idx) {
         uint8_t* c = (uint8_t*)g_players[idx];
-        if (!c || c[0x810]) { g_stillSince[idx] = 0; continue; }
+        // not there, dead or waiting, or its controls locked (a movie, a scene of the level): left alone
+        if (!c || c[0x810] || Locked(c)) { g_stillSince[idx] = 0; g_runSince[idx] = 0; continue; }
+        const int st = ((int(__cdecl*)(const void*))0x42F570)(c);
+        if (st == 1 || st == 2) { if (!g_runSince[idx]) g_runSince[idx] = now; }
+        else g_runSince[idx] = 0;
         float* p = (float*)(c + 0x30);
         const float dx = p[0] - g_stillPos[idx][0], dz = p[2] - g_stillPos[idx][2];
         if (!g_stillSince[idx] || dx * dx + dz * dz > 0.09f) {
             g_stillSince[idx] = now; memcpy(g_stillPos[idx], p, 12); continue;
         }
-        if (now - g_stillSince[idx] < 1500 || !g_edgeAt[idx] || now - g_edgeAt[idx] > 3000) continue;
+        if (now - g_stillSince[idx] < 1500) continue;
+        // trying to move all that time (walking or running in place): someone standing still is not stuck
+        if (!g_runSince[idx] || now - g_runSince[idx] < 1500) continue;
+        if (g_holdUntil[idx] && (int)(now - g_holdUntil[idx]) < 0) continue;
+        const bool atEdge = g_edgeAt[idx] && now - g_edgeAt[idx] <= 3000;
+        if (!atEdge && (!g_unstick || PvpActive())) continue;
+        stuck[idx] = true;
+        edge[idx] = atEdge;
+    }
+    // the third rule: far from players 1 and 2
+    for (int idx = 2; idx < 4; ++idx) {
+        uint8_t* c = (uint8_t*)g_players[idx];
+        const uint8_t* a = (const uint8_t*)g_players[0];
+        const uint8_t* b = (const uint8_t*)g_players[1];
+        if (!g_unstick || !c || c[0x810] || Locked(c) || PvpActive() || stuck[idx]) { g_farSince[idx] = 0; continue; }
+        const uint8_t* lead = nullptr; float d = 1e30f;
+        if (a && !a[0x810] && !Locked(a)) { d = Dist2(c, a); lead = a; }
+        if (b && !b[0x810] && !Locked(b) && Dist2(c, b) < d) { d = Dist2(c, b); lead = b; }
+        if (!lead || d < 225.0f) { g_farSince[idx] = 0; continue; }
+        if (!g_farSince[idx]) { g_farSince[idx] = now; continue; }
+        if (now - g_farSince[idx] < 4000) continue;
+        MoveNextTo(c, lead, idx == 2 ? -1.0f : 1.0f, 1.0f);
+        g_farSince[idx] = 0; g_stillSince[idx] = 0; g_runSince[idx] = 0; g_edgeAt[idx] = 0;
+        Log("co-op: player %d was left far away (%.1f from players 1 and 2), brought back next to player %d", idx + 1, sqrtf(d),
+            lead == a ? 1 : 2);
+    }
+    for (int idx = 0; idx < 4; ++idx) {
+        if (!stuck[idx]) continue;
+        uint8_t* c = (uint8_t*)g_players[idx];
+        // the nearest teammate that is not stuck too; if all are, the nearest
         const uint8_t* best = nullptr; float bestD = 1e30f;
-        for (int i = 0; i < 4; ++i) {
-            const uint8_t* o = (const uint8_t*)g_players[i];
-            if (!o || o == c || o[0x810]) continue;
-            const float* q = (const float*)(o + 0x30);
-            const float d = (p[0] - q[0]) * (p[0] - q[0]) + (p[2] - q[2]) * (p[2] - q[2]);
-            if (d < bestD) { bestD = d; best = o; }
+        for (int pass = 0; pass < 2 && !best; ++pass)
+            for (int i = 0; i < 4; ++i) {
+                const uint8_t* o = (const uint8_t*)g_players[i];
+                if (!o || o == c || o[0x810] || (pass == 0 && stuck[i])) continue;
+                const float d = Dist2(c, o);
+                if (d < bestD) { bestD = d; best = o; }
+            }
+        if (!best || bestD < (edge[idx] ? 64.0f : 16.0f)) continue;   // within 8 (edge) or 4 units of that teammate
+        MoveNextTo(c, best, 1.0f, 1.0f);
+        g_edgeAt[idx] = 0; g_stillSince[idx] = 0; g_runSince[idx] = 0;
+        Log("co-op: player %d was stuck %s (at %.1f), brought back next to a teammate", idx + 1,
+            edge[idx] ? "outside the camera frame" : "running in place", sqrtf(bestD));
+        if (g_recalledAt[idx] && now - g_recalledAt[idx] < 10000) {
+            g_holdUntil[idx] = now + 30000;
+            Log("co-op: player %d keeps going back where it was (the level holds it there): not brought back for 30 s", idx + 1);
         }
-        if (!best || bestD < 64.0f) continue;   // within 8 units of the nearest teammate
-        // like the game's own teleport (event 0x47 at 0x442690..): position at +0x30, +0x40, +0x6C0 and +0x6E0, then
-        // event 0x62 to the character (0x401780), which realigns it
-        const float* q = (const float*)(best + 0x30);
-        const float to[3] = { q[0] + 1.0f, q[1] + 0.5f, q[2] + 1.0f };
-        for (int off : { 0x30, 0x40, 0x6C0, 0x6E0 }) memcpy(c + off, to, sizeof to);
-        ((void(__cdecl*)(void*, int, int, int, int))0x401780)(c, 0x62, 0, 0, 0);
-        g_edgeAt[idx] = 0; g_stillSince[idx] = 0;
-        Log("co-op: player %d was stuck outside the camera frame (at %.1f), brought back next to a teammate",
-            idx + 1, sqrtf(bestD));
+        g_recalledAt[idx] = now;
+    }
+}
+
+// Section changes: a level moves players 1 and 2 to the next place with its own teleport, and only them (the scripts
+// know two players). When both jump far within half a second, the third and the fourth player are brought along (next
+// to player 1 and player 2) if they were left far from them. Our own recalls are done after this check, and the
+// positions kept for the next frame include them, so they never count as jumps.
+// Needed (PC tests of 09/11/2026 at Pelennor Fields): when the oliphants come the level moves players 1 and 2 up the hill
+// (event 0x47 to the points 1017 and 1016); without this the third and fourth stayed 45 units below and the camera, which
+// frames all four, held Aragorn and Legolas at its edge, unable to move. (A test with it on had gone wrong too, but there
+// the story's Dernhelm had been doubled by the more allies, now fixed in Spawners.cpp.) [Coop] FollowTeleports=0 turns it off.
+static bool  g_followTeleports;
+static float g_lastPos[2][3];
+static bool  g_lastValid[2];
+static DWORD g_jumpAt[2];
+
+static void FollowLevelTeleports()
+{
+    if (!g_followTeleports) return;
+    const DWORD now = GetTickCount();
+    for (int i = 0; i < 2; ++i) {
+        const uint8_t* c = (const uint8_t*)g_players[i];
+        if (!c || c[0x810]) { g_lastValid[i] = false; continue; }
+        const float* p = (const float*)(c + 0x30);
+        if (g_lastValid[i]) {
+            const float dx = p[0] - g_lastPos[i][0], dz = p[2] - g_lastPos[i][2];
+            if (dx * dx + dz * dz > 36.0f) g_jumpAt[i] = now;   // more than 6 units in one frame
+        }
+    }
+    if (g_jumpAt[0] && g_jumpAt[1] && now - g_jumpAt[0] <= 500 && now - g_jumpAt[1] <= 500) {
+        g_jumpAt[0] = g_jumpAt[1] = 0;
+        int moved = 0;
+        for (int s = 2; s < 4; ++s) {
+            uint8_t* c = (uint8_t*)g_players[s];
+            const uint8_t* lead = (const uint8_t*)g_players[s - 2];
+            if (!c || c[0x810] || !lead || Dist2(c, lead) < 36.0f) continue;
+            MoveNextTo(c, lead, s == 2 ? -1.0f : 1.0f, -1.0f);
+            g_stillSince[s] = 0; g_runSince[s] = 0; g_edgeAt[s] = 0;
+            ++moved;
+        }
+        Log("co-op: players 1 and 2 moved by the level, %d of the others brought along", moved);
+    }
+}
+
+// a new level: nothing carried over (the players' positions jump from the old level to the new one)
+static void RecallNewLevel()
+{
+    for (int i = 0; i < 4; ++i) g_edgeAt[i] = g_stillSince[i] = g_runSince[i] = g_recalledAt[i] = g_holdUntil[i] = g_farSince[i] = 0;
+    g_lastValid[0] = g_lastValid[1] = false;
+    g_jumpAt[0] = g_jumpAt[1] = 0;
+}
+
+static void KeepLastPositions()
+{
+    for (int i = 0; i < 2; ++i) {
+        const uint8_t* c = (const uint8_t*)g_players[i];
+        g_lastValid[i] = c && !c[0x810];
+        if (g_lastValid[i]) memcpy(g_lastPos[i], c + 0x30, 12);
     }
 }
 
@@ -746,6 +941,8 @@ bool CoopInstall()
     // co-op camera that frames the extra players (and brings back whoever is stuck outside the frame); [Coop] Camera=0
     // leaves the game's own framing of players 1 and 2
     g_camera = IniInt("Coop", "Camera", 1) != 0;
+    g_unstick = IniInt("Coop", "Unstick", 1) != 0;
+    g_followTeleports = IniInt("Coop", "FollowTeleports", 1) != 0;
     if (!g_camera) Log("co-op: camera frames only players 1 and 2 ([Coop] Camera=0)");
     ok &= PatchCall(0x46FBBA, kFramePair, (const void*)&FramePairStub);
     // bring back whoever is stuck outside the camera frame

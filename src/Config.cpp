@@ -21,6 +21,12 @@ int IniInt(const char* section, const char* key, int def)
     return GetPrivateProfileIntA(section, key, def, ini);
 }
 
+void IniText(const char* section, const char* key, char* out, size_t n)
+{
+    char ini[MAX_PATH]; IniPath(ini, sizeof ini);
+    GetPrivateProfileStringA(section, key, "", out, (DWORD)n, ini);
+}
+
 void IniWriteInt(const char* section, const char* key, int value)
 {
     char ini[MAX_PATH], num[16]; IniPath(ini, sizeof ini);

@@ -273,6 +273,7 @@ static LONG CALLBACK CrashLogger(EXCEPTION_POINTERS* ep)
 }
 
 void PvpInstall();                // Pvp.cpp
+void SpawnersInstall();           // Spawners.cpp
 void SupportInstall(bool victoryKey);   // Support.cpp
 void AudioInstall(bool on);       // Audio.cpp
 void AudioBanksInstall(bool on);  // Audio.cpp
@@ -359,10 +360,11 @@ static void Start()
     FastTextInstall(IniInt("General", "FastText", 1));
     SupportInstall(IniInt("Diag", "VictoryKey", 0) != 0);
     AudioInstall(IniInt("Diag", "AudioLog", 0) != 0);
-    SimInstall(IniInt("Debug", "SimPads", 0) != 0);
+    SimInstall(IniInt("Debug", "SimPads", 0));
     if (g_cfg.coop) {
         AudioBanksInstall(IniInt("Coop", "SoundBanks", 1) != 0);
         CoopInstall();
+        SpawnersInstall();
     }
     else Log("co-op with 3 or 4 players is off ([Coop] Enabled=0)");
     PvpInstall();

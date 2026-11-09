@@ -18,7 +18,7 @@
 #include <stdint.h>
 #include <string>
 
-#define ROTKPLUS_VERSION "1.4.2"
+#define ROTKPLUS_VERSION "1.5.0"
 
 // --- one source for MSVC and g++ ----------------------------------------------------------------------------------
 // Inline assembly, Intel syntax, one instruction per ASM(...) line between ASM_BEGIN and ASM_END: MSVC reads every line
@@ -97,12 +97,21 @@ extern Config g_cfg;
 void LoadConfig();
 // ROTKPlus.ini reads: the current section is [Coop] / [PvP]; the old [Coop3] section is still accepted.
 int  IniInt(const char* section, const char* key, int def);
+// the highest factor of "more enemies" and "more allies", in tenths (x7 since 09/11/2026, to look for the limits of the
+// game with many characters; x5 before)
+const int kMaxFactor = 70;
 void IniWriteInt(const char* section, const char* key, int value);
+void IniText(const char* section, const char* key, char* out, size_t n);   // "" if missing
 
 // --- Coop.cpp: third and fourth player ------------------------------------------------------------------------
 bool CoopInstall();
 extern volatile int g_spawningP3 ASM_EXTERN(g_spawningP3);   // 1 or 2 while the third or fourth player is handled
-int  HeroOfSlot(int slot);        // hero of an extra player (slot 2 = third, 3 = fourth) in the current level, -1 none
+int  HeroOfSlot(int slot);
+const char* CoopLevelFile();     // the level being played, as its package ("min00"), "" for the menu        // hero of an extra player (slot 2 = third, 3 = fourth) in the current level, -1 none
+
+// --- Spawners.cpp: more enemies and allies in the campaign (factor in tenths: 10 as in the game ... 30)
+void SupportDumpScriptRing(const char* level);   // Support.cpp, [Diag] ScriptRing=1
+void SpawnersConfigure(bool single, int factorTenths, int allyTenths);   // allies: 0 = as the enemies
 
 // --- Pads.cpp: controllers of the third and fourth player (SDL3) -----------------------------------------------
 bool PadsInstall(const char* padName);
@@ -110,7 +119,7 @@ bool PadConnected(int slot);      // controller opened for slot 2 (third) or 3 (
 std::string PadKeyOfSlot(int slot);   // a stable key of that controller (serial or path, hashed), "" if none
 
 // --- Sim.cpp: keyboard-simulated controllers for testing ([Debug] SimPads=1) ------------------------------
-void SimInstall(bool on);
+void SimInstall(int mode);   // [Debug] SimPads: 1 own keys, 2 also following player 1
 bool SimActive();
 void SimFrame(bool (*hasPad)(int slot));
 
@@ -122,6 +131,7 @@ bool ScreensInstall();
 int  CharSelChoice(int slot);                 // hero chosen by an extra player in the selection screen, -1 none
 bool CharSelOnChoice(int player, int hero);   // from 0x47DF00/0x47DF20: true = the choice belongs to an extra player
 int  CoopPlayers();                           // players chosen in the main menu: 2, 3 or 4 (2 if the mod is off)
+void CoopAskBack(int slot);                    // the third or fourth player pressed Back: bring it next to player 1 or 2
 bool Coop3Wanted();                           // at least 3 players
 bool Coop4Wanted();                           // 4 players
 void MenuIdleReset();                         // the main menu is in use: its demo timer starts again

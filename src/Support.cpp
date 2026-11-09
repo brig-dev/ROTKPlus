@@ -42,10 +42,39 @@ static NAKED void ScriptCallOrig()   // mov edx,[esp+4]; sub esp,24h
     ASM_END
 }
 
+// [Diag] ScriptRing=1 (08/11/2026, the Top of the Wall's count of the orcs on the wall): the last 400 script calls, with
+// their arguments as they are (hex) and the result, written to the log at the end of every level (SupportDumpScriptRing)
+struct RingCall { DWORD at; int type, x; uint32_t code, a[3], res; };
+static RingCall g_ring[400];
+static int      g_ringN, g_ringAt;
+static bool     g_ringOn;
+
+void SupportDumpScriptRing(const char* level)
+{
+    if (!g_ringOn || !g_ringN) return;
+    Log("script ring: the last %d script calls of %s (type/code, x, three arguments, result; hex and as floats)", g_ringN, level);
+    const int first = g_ringN < 400 ? 0 : g_ringAt;
+    for (int i = 0; i < g_ringN; ++i) {
+        const RingCall& c = g_ring[(first + i) % 400];
+        float f[4];
+        memcpy(f, c.a, 12); memcpy(f + 3, &c.res, 4);
+        Log("script ring: %u %X/%08X x%X  %08X %08X %08X -> %08X  (%g %g %g -> %g)", (unsigned)c.at, c.type, c.code, c.x,
+            c.a[0], c.a[1], c.a[2], c.res, f[0], f[1], f[2], f[3]);
+    }
+    g_ringN = g_ringAt = 0;
+}
+
 static uint32_t __cdecl ScriptCall(int type, int x, uint32_t code, float* args, float* res, int a6, int a7)
 {
     const uint32_t r = GameFn((uint32_t(__cdecl*)(int, int, uint32_t, float*, float*, int, int))&ScriptCallOrig)(
         type, x, code, args, res, a6, a7);
+    if (g_ringOn && *(const int*)0x562AC0 == 0) {   // in a level, not the menus' scripts
+        RingCall& c = g_ring[g_ringAt];
+        c = RingCall{ GetTickCount(), type, x, code, { 0, 0, 0 }, 0 };
+        Guard([&] { if (args) memcpy(c.a, args, 12); if (res) memcpy(&c.res, res, 4); });
+        g_ringAt = (g_ringAt + 1) % 400;
+        if (g_ringN < 400) ++g_ringN;
+    }
     PlayersScriptCall(type, code, args);
     ScreensFrame();
     return r;
@@ -192,6 +221,8 @@ void SupportFrame()   // from Pads.cpp, every frame, on the game's thread
 
 void SupportInstall(bool victoryKey)
 {
+    g_ringOn = IniInt("Diag", "ScriptRing", 0) != 0;
+    if (g_ringOn) Log("script ring: the last 400 script calls written at the end of every level ([Diag] ScriptRing=1)");
     static const uint8_t choiceOld[] = { 0x8B, 0x44, 0x24, 0x04, 0x83, 0xF8, 0xFF };
     static const uint8_t scriptOld[] = { 0x8B, 0x54, 0x24, 0x04, 0x83, 0xEC, 0x24 };
     bool ok = PatchJmp(0x47DF00, choiceOld, sizeof choiceOld, (const void*)&SetChoice1);

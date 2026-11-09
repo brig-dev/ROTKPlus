@@ -4,6 +4,35 @@
 [Coop]
 ; 1 = third and fourth player in co-op games (and the Versus modes, on the Multiplayer page); 0 = the mod does nothing
 Enabled=1
+; MoreEnemies: 1 = more of the levels' common enemies in the co-op campaign (their spawners let out more, and the
+; level scripts count them as their own; captains, trolls, mumakil, spiders and bosses stay as they are); 0 = off
+MoreEnemies=1
+; EnemyFactor: how many, in tenths: 10 as in the game, 15, 20, 30, 50 or 70 (x1.5 ... x7), chosen on the Multiplayer
+; page and saved here; -1 = the recommended one for the players (2: as in the game, 3: x1.5, 4: x2). Other values are
+; taken to the nearest of these
+EnemyFactor=-1
+; AllyFactor: the allies' spawners (soldiers of Gondor and Rohan): 0 = as many more as the enemies, 10 = as in the game,
+; 15 ... 70 their own. A spawner that lets out one character only (a story character, a captain) is never multiplied
+AllyFactor=0
+; the same two for a Single game, chosen on Who is playing?
+SingleEnemyFactor=10
+SingleAllyFactor=0
+; (at the Top of the Wall the level is lost when too many orcs are on the wall: a high factor gets there soon)
+; MoreEnemiesMaxAlive: at most this many alive at once from one spawner after the multiplication
+MoreEnemiesMaxAlive=16
+; Unstick: 1 = with 3 or 4 players, whoever keeps walking or running in place for 1.5 s (stuck against a wall or a step)
+; while the nearest teammate is farther than 4 units is brought next to that teammate, and the third or fourth player
+; farther than 15 units from players 1 and 2 for 4 s is brought next to the nearer of the two (not in Versus games, not
+; during the level's scenes). Players 3 and 4 can always press Back to come back next to player 1 or 2
+Unstick=1
+; FollowTeleports: 1 = when a level moves players 1 and 2 to another place, the third and fourth come along
+FollowTeleports=1
+; Camera: 1 = the co-op camera frames all the players (players 1 and 2 only during the level's scenes); 0 = the game's
+; own framing of players 1 and 2, only to compare
+Camera=1
+; MoreDraws: 1 = room for 8192 items in the renderer's queue (the game has 1024: with many enemies on screen the HUD, the
+; texts and the enemies themselves flickered or vanished); 0 = the game's own
+MoreDraws=1
 ; players of the co-op: 2, 3 or 4. It is chosen on the Multiplayer page (or with left/right on the Co-op entry, with
 ; [Players] MultiplayerPage=0) and saved here
 Players=3
@@ -132,6 +161,9 @@ BossBones=0
 [Debug]
 ; for testing only: 1 = players 2, 3 and 4 are driven by the keyboard, so the co-op can be tried without any controller
 ; (player 1 uses the game's own keyboard and mouse). Keys: see the top of src/Sim.cpp
+; 2 = the same, and in the levels players 2, 3 and 4 also follow player 1's W A S D and mouse (one person, four heroes)
+; 3 = player 1's controller (or keyboard and mouse) drives players 2, 3 and 4: in the levels they move and fight together
+; with player 1, in the menus it serves whoever's turn it is (one person, four heroes on screen, e.g. for videos)
 SimPads=0
 
 [Log]

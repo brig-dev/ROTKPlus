@@ -22,6 +22,7 @@
     <ClCompile Include="Pvp.cpp" />
     <ClCompile Include="Screens.cpp" />
     <ClCompile Include="Sim.cpp" />
+    <ClCompile Include="Spawners.cpp" />
     <ClCompile Include="Support.cpp" />
   </ItemGroup>
   <ItemGroup>

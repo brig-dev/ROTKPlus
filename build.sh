@@ -11,7 +11,7 @@ set -e
 cd "$(dirname "$0")"
 CXX="${CXX:-i686-w64-mingw32-g++}"
 SRC="src/Audio.cpp src/Config.cpp src/Coop.cpp src/Guard.cpp src/HeroIndex.cpp src/Hud.cpp src/Icons.cpp src/Lang.cpp
-     src/Main.cpp src/Pads.cpp src/Players.cpp src/Pvp.cpp src/Screens.cpp src/Sim.cpp src/Support.cpp"
+     src/Main.cpp src/Pads.cpp src/Players.cpp src/Pvp.cpp src/Screens.cpp src/Sim.cpp src/Spawners.cpp src/Support.cpp"
 echo "Building ROTKPlus.dll with $CXX..."
 $CXX -std=gnu++17 -O2 -Wall -Wno-multichar -msse2 -mfpmath=sse -fno-strict-aliasing -fwrapv \
      -fno-delete-null-pointer-checks -DROTKPLUS_MOD -shared -static -s -o ROTKPlus.dll $SRC

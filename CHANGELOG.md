@@ -1,5 +1,45 @@
 # Changelog
 
+## 1.5.0
+
+- **The ROTKPlus launcher**: a launcher of its own for The Return of the King PC, made from Shagg's Athelas and ROTK
+  Fix (MIT). The Fellowship with each player's statistics, deeds and a card to share as a picture, the screenshots
+  (by day, copy, use as background), the History of every version, a controller and the buttons for each of the four
+  players, and every page usable with a controller, its buttons drawn as on it (Xbox, PlayStation, Nintendo). A guided
+  first start (language, game, players), a slowly moving background with embers (Animations, to turn off), ten
+  languages, and pictures for Steam's library when ROTKPlus is added there as a non-Steam game.
+- Campaign: **more enemies**, chosen on the Multiplayer page (as in the game, x1.5, x2, x3, x5 or x7, with a line of Gimli's at x7; the recommended one follows
+  the players: x1.5 with three, x2 with four), and **more allies**, as many as the enemies or a factor of their own. The
+  same two choices for a Single game on Who is playing?, kept apart (as in the game unless chosen). At the Top of the
+  Wall the level is lost when too many orcs are on the wall: a high factor gets there soon. The levels' spawners let out more of the common enemies (soldiers, shields and archers), and the level
+  scripts count them as their own, so the waves end as before; captains, trolls, mumakil, spiders and bosses stay as
+  they are. At most 16 alive at once from one spawner (`MoreEnemiesMaxAlive`). Every spawner is written in the log.
+- Co-op with 3 or 4 players: whoever keeps running in place for 1.5 s (stuck against a wall or a step) is brought
+  next to the nearest teammate (`[Coop] Unstick`), as was already done for whoever is stuck outside the camera frame.
+  Only a player trying to move is brought back, never during the level's scenes, and one the level keeps putting back
+  (at a ballista) is left alone: at Pelennor Fields a player at a ballista was taken away from it again and again and
+  the level stopped going on. Two players stuck together are brought to the group, not one next to the other.
+- Co-op with 3 or 4 players: when a level moves players 1 and 2 to another place, the third and fourth come along.
+- Co-op with 3 or 4 players: the third or fourth player left far from players 1 and 2 (15 units for 4 s) is brought
+  next to the nearer of the two, and both can **press Back** (View, Create) to come back next to player 1 or 2 at any
+  time (Start stays the pause). With the keyboard-simulated pads: N for player 3, Numpad 9 for player 4.
+- Co-op with 3 or 4 players: during the level's scenes (the controls locked) the camera frames players 1 and 2 only,
+  as the scripts expect: at Pelennor Fields, when the oliphants come, the level walks them up the hill and waits.
+- More enemies and allies: a spawner that lets out one character only (the story's Dernhelm at Pelennor Fields, a
+  captain) is never multiplied: doubled, Dernhelm and Eowyn's scene went wrong.
+- Many enemies on screen no longer make the HUD, the kill texts and the enemies themselves flicker or vanish: the
+  renderer's queue has room for 8192 items instead of 1024 (`[Coop] MoreDraws`).
+- Co-op with 3 or 4 players: the extra players no longer take the numbers of the level's own objects for the game's
+  messages (at Pelennor Fields, the Paths of the Dead and the Black Gate they took 3 and 4, so the scripts' messages to
+  those objects reached them).
+- Many more characters (four players, more enemies and allies) no longer crash the game at 0x4795F7: its 1024 nodes
+  for the collision queries are topped up from a reserve of 3072 when they run out.
+- The third and fourth player's buttons can be set like the first two's: `[GamepadButtons3]` and `[GamepadButtons4]`
+  in `ROTKFix.ini`, the same keys as ROTK Fix's `[GamepadButtons]` (the ROTKPlus launcher writes them on its Controls tab).
+  Without them, the original layout as before.
+- For testing: `[Debug] SimPads=2`, players 2-4 follow player 1's keyboard and mouse in the levels; `SimPads=3`, player
+  1's controller drives all four (videos of a four-player game made by one person).
+
 ## 1.4.2
 
 - Versus: **a parry no longer stops everything**. Between players a fierce attack (Triangle), the last move of a combo
