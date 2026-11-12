@@ -1,7 +1,17 @@
+<p align="center"><img src="docs/img/logo.png" width="560" alt="ROTKPlus"></p>
+
 # ROTKPlus
 
 Co-op with **3 and 4 players** and a **player-versus-player mode** for
 *The Lord of the Rings: The Return of the King* (PC, 2003).
+
+<table align="center">
+  <tr>
+    <td align="center" width="200"><img src="docs/img/icon_four_players.png" height="64" alt=""><br><b>Four players</b><br>on one screen, in the whole campaign</td>
+    <td align="center" width="200"><img src="docs/img/icon_versus.png" height="64" alt=""><br><b>Versus</b><br>2 to 4 players, or 2 against 2</td>
+    <td align="center" width="200"><img src="docs/img/icon_more_enemies.png" height="64" alt=""><br><b>More enemies</b><br>and allies, from x1.5 to x7</td>
+  </tr>
+</table>
 
 The game ships with a 2-player co-op. ROTKPlus adds a third and a fourth hero to the same level, each with its own
 controller, HUD box, mark above the head, shared lives, level-up, and turn in the end-of-level screens. It also adds a
@@ -324,7 +334,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for how.
 ## Credits and legal
 
 - Created by **brig-dev**, with the help of Claude (Anthropic) for the analysis and the code. The work consisted of
-  reverse engineering the 2003 executable, writing the patches, and testing every feature in the game.
+  reverse engineering the 2003 executable, writing the patches, and testing every feature in the game. The ROTKPlus
+  logo, its icons and the launcher's pictures were made with AI image tools; they contain nothing of the game or of
+  the films.
 - The ROTKPlus launcher and ROTK Fix are [Athelas and ROTK Fix](https://github.com/Shagg88/Athelas) by **Shagg** (MIT;
   also at [SourceForge](https://sourceforge.net/projects/athelas/)), with our changes; his copyright notice is in
   [`launcher/LICENSE`](launcher/LICENSE). The mod itself includes none of their files. ROTKPlus was not made or endorsed
