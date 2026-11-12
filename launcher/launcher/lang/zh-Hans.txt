@@ -1518,6 +1518,7 @@ Download ROTKPlus %s from GitHub (about 25 MB) and install it here? = 从 GitHub
 Choose a saves backup (a zip ROTKPlus made) = 选择存档备份（ROTKPlus 生成的 zip）
 ROTKPlus %s is out. Your settings, saves and achievements are kept. = ROTKPlus %s 已发布。你的设置、存档和成就都会保留。
 ROTKPlus %s is out  -  press Update at the top right = ROTKPlus %s 已发布  -  请按右上角的“更新”
+ROTKPlus %s is out = ROTKPlus %s 已发布
 isn't added to ROTKPlus any more - add it again, then make a new shortcut. = 已不在 ROTKPlus 中 - 请重新添加，然后创建新的快捷方式。
 Windows doesn't let ROTKPlus change its own folder. Download the update from its page instead. = Windows 不允许 ROTKPlus 修改自己的文件夹。请从其页面下载更新。
 That file isn't a zip ROTKPlus can read. = 该文件不是 ROTKPlus 能读取的 zip。

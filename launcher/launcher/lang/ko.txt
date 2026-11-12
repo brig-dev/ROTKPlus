@@ -1518,6 +1518,7 @@ Download ROTKPlus %s from GitHub (about 25 MB) and install it here? = GitHub에�
 Choose a saves backup (a zip ROTKPlus made) = 저장 백업 선택 (ROTKPlus가 만든 zip)
 ROTKPlus %s is out. Your settings, saves and achievements are kept. = ROTKPlus %s가 나왔습니다. 설정, 저장, 업적은 그대로 남습니다.
 ROTKPlus %s is out  -  press Update at the top right = ROTKPlus %s가 나왔습니다  -  오른쪽 위의 업데이트를 누르세요
+ROTKPlus %s is out = ROTKPlus %s가 나왔습니다
 isn't added to ROTKPlus any more - add it again, then make a new shortcut. = 는 더 이상 ROTKPlus에 추가되어 있지 않습니다 - 다시 추가한 다음 새 바로 가기를 만드세요.
 Windows doesn't let ROTKPlus change its own folder. Download the update from its page instead. = Windows가 ROTKPlus가 자기 폴더를 바꾸는 것을 허용하지 않습니다. 해당 페이지에서 업데이트를 내려받으세요.
 That file isn't a zip ROTKPlus can read. = 그 파일은 ROTKPlus가 읽을 수 있는 zip이 아닙니다.

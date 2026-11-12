@@ -109,11 +109,11 @@ bool orn_arch_button(const char *label, ImVec2 size, ImFont *font, bool enabled)
     return pressed && enabled;
 }
 
-bool orn_plate_button(const char *label, ImVec2 size, bool enabled)
+bool orn_plate_button(const char *label, ImVec2 size, bool enabled, bool nav)
 {
     ImVec2 p = ImGui::GetCursorScreenPos();
     ImGui::BeginDisabled(!enabled);
-    bool pressed = ImGui::InvisibleButton(label, size);
+    bool pressed = ImGui::InvisibleButton(label, size, nav ? ImGuiButtonFlags_EnableNav : ImGuiButtonFlags_None);
     // the controller's / keyboard's cursor on it lights it as the mouse does: an InvisibleButton draws no cursor of
     // its own, so Library, Save and Play showed nothing when reached with a controller (5 Nov)
     bool hov = enabled && (ImGui::IsItemHovered() || (ImGui::IsItemFocused() && GImGui->NavCursorVisible)),

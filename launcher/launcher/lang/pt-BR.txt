@@ -1529,6 +1529,7 @@ Download ROTKPlus %s from GitHub (about 25 MB) and install it here? = Baixar o R
 Choose a saves backup (a zip ROTKPlus made) = Escolha um backup dos saves (um zip feito pelo ROTKPlus)
 ROTKPlus %s is out. Your settings, saves and achievements are kept. = Saiu o ROTKPlus %s. Suas configurações, saves e conquistas são mantidos.
 ROTKPlus %s is out  -  press Update at the top right = Saiu o ROTKPlus %s  -  aperte Atualizar no canto superior direito
+ROTKPlus %s is out = Saiu o ROTKPlus %s
 isn't added to ROTKPlus any more - add it again, then make a new shortcut. = não está mais adicionado ao ROTKPlus - adicione-o de novo e depois crie um novo atalho.
 Windows doesn't let ROTKPlus change its own folder. Download the update from its page instead. = O Windows não deixa o ROTKPlus mudar sua própria pasta. Baixe a atualização na página dela.
 That file isn't a zip ROTKPlus can read. = Esse arquivo não é um zip que o ROTKPlus consiga ler.

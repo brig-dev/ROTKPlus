@@ -84,6 +84,8 @@ void update_check_start(const std::string &current)
 
 std::string update_newer()
 {
+    static const char *fake = getenv("ROTKPLUS_NEWER");   // testing: a newer version as if GitHub said so (nothing installs it)
+    if (fake && fake[0]) return fake;
     if (!g_done) return "";
     EnterCriticalSection(&g_lock);
     std::string v = g_latest;

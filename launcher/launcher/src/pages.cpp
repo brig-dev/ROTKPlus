@@ -143,8 +143,8 @@ static void update_button(App &a, ImVec2 size, float sy)
         if (!nv.empty() || ust == 1 || ust == 2) {
             char lbl[64];
             if (ust == 1 || ust == 2)   // two steps, each 0 to 100%: the download, then the files put in place
-                snprintf(lbl, sizeof lbl, ust == 1 ? "Downloading  %d%%##hdrupd" : "Installing  %d%%##hdrupd", (int)(uprog * 100 + 0.5f));
-            else snprintf(lbl, sizeof lbl, "Update to %s##hdrupd", nv.c_str());
+                snprintf(lbl, sizeof lbl, (std::string(tr(ust == 1 ? "Downloading  %d%%" : "Installing  %d%%")) + "##hdrupd").c_str(), (int)(uprog * 100 + 0.5f));
+            else snprintf(lbl, sizeof lbl, (std::string(tr("Update to %s")) + "##hdrupd").c_str(), nv.c_str());   // (translated before: "Update to 1.5.2" matches no line, it showed "Aggiorna to")
             ImGui::PushFont(F_SMALL, F_SMALL->LegacySize);
             float bw = std::max(S(150), ImGui::CalcTextSize(lbl, nullptr, true).x + S(28));
             ImGui::SetCursorPos(ImVec2(size.x - pad - bw, sy + S(4)));
@@ -480,26 +480,43 @@ void draw_ui(App &a, ImVec2 size, SDL_Renderer *ren)
         const int forcedHints = pad_hints_test();
         const bool padHints = !msg && (forcedHints >= 0 || (a.controllers > 0 && GImGui->NavCursorVisible &&
                                                            GImGui->NavInputSource == ImGuiInputSource_Gamepad));
-        float cardH = S(32) + (newer.empty() ? 0.0f : S(18));
-        if (padHints) cardH += S(26);   // (ROTKPlus: the buttons drawn, on one line)
-        if (msg) {   // room for the message, however many lines it wraps to
-            ImGui::PushFont(F_SMALL, F_SMALL->LegacySize);
-            cardH += ImGui::CalcTextSize(a.message.c_str(), nullptr, false, cardW - S(18)).y + S(2);
-            ImGui::PopFont();
-        }
-        ImVec2 c0 = ImGui::GetWindowPos() + ImVec2(cardX, by + (playH - cardH) * 0.5f), c1 = c0 + ImVec2(cardW, cardH);
-        orn_plate(ImGui::GetWindowDrawList(), c0, c1, ImGui::GetColorU32(rgb(15, 14, 13, 0.86f)), false);
+        // the card's height from the font's own line height (ROTKPlus 1.5.2: it counted the "is out" line as 18 pixels,
+        // less than a line and its spacing, so with the controller's buttons too their line went below the card)
         ImGui::PushFont(F_SMALL, F_SMALL->LegacySize);
-        ImGui::SetCursorPos(ImVec2(cardX + S(10), by + (playH - cardH) * 0.5f + S(5)));
+        const float lh = ImGui::GetTextLineHeight(), sp = ImGui::GetStyle().ItemSpacing.y, textW = cardW - S(18);
+        char sum[256], nw[160] = "", nwShort[96] = "";
+        if (own && !g.exeFound) snprintf(sum, sizeof sum, "%s", "Add a game to begin");
+        else if (own) snprintf(sum, sizeof sum, "%d x %d  |  %s  |  %d fps  |  %s", w, h, dm[a.s.displayMode], fps, pn[detect_preset(a.s)]);
+        else if (ttShown) snprintf(sum, sizeof sum, "%s", tt_summary(a).c_str());
+        else snprintf(sum, sizeof sum, "%s  |  %s", game_kind_name(a.lib[a.cur].kind),
+                      game_kind_playable(a.lib[a.cur].kind) ? "settings in its own launcher" : "not playable yet");
+        if (!newer.empty()) snprintf(nw, sizeof nw, tr("ROTKPlus %s is out  -  press Update at the top right"), newer.c_str());   // (translated here: once written, it no longer matches the translation's line)
+        if (!newer.empty()) snprintf(nwShort, sizeof nwShort, tr("ROTKPlus %s is out"), newer.c_str());
+        static const char kGap[] = "     \xc2\xb7     ";
+        // the news of a newer version on the summary's line when both fit there, else on a line of its own
+        // (the summary is translated as drawn: some room for longer words); when the whole news doesn't fit, its short
+        // form, "ROTKPlus 1.5.2 is out" (the header's button says the rest)
+        const float sumW = ImGui::CalcTextSize(sum).x * 1.15f + ImGui::CalcTextSize(kGap).x;
+        if (nw[0] && sumW + ImGui::CalcTextSize(nw).x > textW && sumW + ImGui::CalcTextSize(nwShort).x <= textW)
+            snprintf(nw, sizeof nw, "%s", nwShort);
+        const bool nwInline = nw[0] && sumW + ImGui::CalcTextSize(nw).x <= textW;
+        float cardH = S(12) + lh;
+        if (nw[0] && !nwInline) cardH += sp + lh;
+        if (msg) cardH += sp + ImGui::CalcTextSize(a.message.c_str(), nullptr, false, textW).y;   // however many lines it wraps to
+        if (padHints) cardH += sp + S(2) + ImGui::GetFontSize() * 1.2f;   // (ROTKPlus: the buttons drawn, on one line)
+        // centred on Play, but never lower than a little under it (the window's frame is close below)
+        const float cy = std::min(by + (playH - cardH) * 0.5f, by + playH + S(6) - cardH);
+        ImVec2 c0 = ImGui::GetWindowPos() + ImVec2(cardX, cy), c1 = c0 + ImVec2(cardW, cardH);
+        orn_plate(ImGui::GetWindowDrawList(), c0, c1, ImGui::GetColorU32(rgb(15, 14, 13, 0.86f)), false);
+        ImGui::SetCursorPos(ImVec2(cardX + S(10), cy + S(5)));
         ImGui::PushTextWrapPos(cardX + cardW - S(8));
-        if (own && !g.exeFound) ImGui::TextColored(C_DIM, "Add a game to begin");
-        else if (own) ImGui::TextColored(C_DIM, "%d x %d  |  %s  |  %d fps  |  %s", w, h, dm[a.s.displayMode], fps, pn[detect_preset(a.s)]);
-        else if (ttShown) ImGui::TextColored(C_DIM, "%s", tt_summary(a).c_str());
-        else ImGui::TextColored(C_DIM, "%s  |  %s", game_kind_name(a.lib[a.cur].kind),
-                                game_kind_playable(a.lib[a.cur].kind) ? "settings in its own launcher" : "not playable yet");
-        if (!newer.empty()) {
+        ImGui::TextColored(C_DIM, "%s", sum);
+        if (nwInline) {
+            ImGui::SameLine(0, 0); ImGui::TextColored(C_DIM, "%s", kGap);
+            ImGui::SameLine(0, 0); ImGui::TextColored(C_GOLD_H, "%s", nw);
+        } else if (nw[0]) {
             ImGui::SetCursorPosX(cardX + S(10));
-            ImGui::TextColored(C_GOLD_H, "ROTKPlus %s is out  -  press Update at the top right", newer.c_str());
+            ImGui::TextColored(C_GOLD_H, "%s", nw);
         }
         if (msg) {
             ImGui::SetCursorPosX(cardX + S(10));

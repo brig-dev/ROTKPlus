@@ -13,6 +13,23 @@
 static const ImU32 k_gem[4] = { IM_COL32(232, 140, 40, 255), IM_COL32(80, 120, 235, 255), IM_COL32(40, 170, 90, 255),
                                 IM_COL32(240, 200, 60, 255) };   // the rings of the logo: amber, sapphire, emerald, gold
 
+// a controller's name as shown: under Steam Input a controller can be named by one of Steam's own translation keys,
+// "#SettingsController_SteamController" under SteamOS (owner's screenshot, 12 Nov): the words after the last
+// '_' (or the '#'), apart where a capital follows a small letter, "Steam Controller"
+std::string pad_shown_name(const char *n)
+{
+    if (!n || !n[0]) return "?";
+    if (n[0] != '#') return n;
+    const char *w = strrchr(n, '_');
+    w = w && w[1] ? w + 1 : n + 1;
+    std::string s;
+    for (const char *c = w; *c; c++) {
+        if (c > w && isupper((unsigned char)*c) && islower((unsigned char)c[-1])) s += ' ';
+        s += *c;
+    }
+    return s.empty() ? std::string("Controller") : s;
+}
+
 static std::string key_of(SDL_Gamepad *pad)
 {
     if (!pad) return "";
@@ -84,7 +101,7 @@ void rotkplus_pads_section(App &a)
     std::vector<std::string> keys;
     for (SDL_Gamepad *g : a.pads) keys.push_back(key_of(g));
     for (size_t i = 0; i < a.pads.size(); i++) {
-        const char *name = SDL_GetGamepadName(a.pads[i]);
+        const std::string name = pad_shown_name(SDL_GetGamepadName(a.pads[i]));
         int whose = -1;
         for (int p = 0; p < 4; p++) if (!keys[i].empty() && !_stricmp(player_key(a, p).c_str(), keys[i].c_str())) whose = p;
         ImVec2 c = ImGui::GetCursorScreenPos() + ImVec2(S(8), ImGui::GetTextLineHeight() * 0.5f + S(2));
@@ -92,7 +109,7 @@ void rotkplus_pads_section(App &a)
         if (pad_busy(a.pads[i])) ImGui::GetWindowDrawList()->AddCircleFilled(c, S(9), IM_COL32(214, 226, 246, 120), 16);
         gem(c, S(6), col);
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + S(22));
-        ImGui::TextUnformatted(name ? name : "?");
+        ImGui::TextUnformatted(name.c_str());
         ImGui::SameLine();
         if (whose >= 0) ImGui::TextColored(C_DIM, "%s %d", tr("player"), whose + 1);
         else ImGui::TextColored(C_DIM, "%s", tr("nobody's (goes to the first free player)"));
@@ -124,7 +141,7 @@ void rotkplus_pads_section(App &a)
         gem(ImGui::GetCursorScreenPos() + ImVec2(-S(14), ImGui::GetFrameHeight() * 0.5f), S(5), k_gem[p]);
         std::string shown = g_waitFor == p ? tr("Press a button on its controller...")
                           : k.empty() ? tr("Automatic")
-                          : connected >= 0 ? (SDL_GetGamepadName(a.pads[connected]) ? SDL_GetGamepadName(a.pads[connected]) : "?")
+                          : connected >= 0 ? pad_shown_name(SDL_GetGamepadName(a.pads[connected]))
                                            : std::string(tr("its controller (not connected)"));
         const char *btn = g_waitFor == p ? tr("Cancel") : tr("Press to choose");
         const float bw = ImGui::CalcTextSize(btn).x + ImGui::GetStyle().FramePadding.x * 2;
@@ -133,9 +150,9 @@ void rotkplus_pads_section(App &a)
             if (ImGui::Selectable(tr("Automatic"), k.empty())) set_player_key(a, p, "");
             for (size_t i = 0; i < a.pads.size(); i++) {
                 if (keys[i].empty()) continue;
-                const char *n = SDL_GetGamepadName(a.pads[i]);
+                const std::string n = pad_shown_name(SDL_GetGamepadName(a.pads[i]));
                 ImGui::PushID((int)i);
-                if (ImGui::Selectable(n ? n : "?", connected == (int)i)) set_player_key(a, p, keys[i]);
+                if (ImGui::Selectable(n.c_str(), connected == (int)i)) set_player_key(a, p, keys[i]);
                 ImGui::PopID();
             }
             ImGui::EndCombo();
@@ -243,7 +260,7 @@ void rotkplus_pad_lines(App &a, std::vector<std::string> &lines)
     for (int p = 0; p < 4; p++)
         for (size_t i = 0; i < keys.size(); i++)
             if (!chosen[p].empty() && !_stricmp(keys[i].c_str(), chosen[p].c_str())) taken[i] = true;
-    auto name_of = [&](size_t i) { const char *n = SDL_GetGamepadName(a.pads[i]); return std::string(n ? n : "?"); };
+    auto name_of = [&](size_t i) { return pad_shown_name(SDL_GetGamepadName(a.pads[i])); };
     for (int p = 0; p < 4; p++) {
         std::string what;
         if (!chosen[p].empty()) {

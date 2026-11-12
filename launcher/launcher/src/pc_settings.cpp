@@ -35,7 +35,7 @@ void refresh_controllers(App &a)
     int n = 0;
     SDL_JoystickID *ids = SDL_GetGamepads(&n);
     a.controllers = n;
-    a.controller = n > 0 && SDL_GetGamepadNameForID(ids[0]) ? SDL_GetGamepadNameForID(ids[0]) : "";
+    a.controller = n > 0 && SDL_GetGamepadNameForID(ids[0]) ? pad_shown_name(SDL_GetGamepadNameForID(ids[0])) : "";
     a.controllerType = n > 0 ? SDL_GetGamepadTypeForID(ids[0]) : SDL_GAMEPAD_TYPE_UNKNOWN;
     for (int i = 0; i < n; i++) if (SDL_Gamepad *g = SDL_OpenGamepad(ids[i])) a.pads.push_back(g);
     SDL_free(ids);

@@ -284,6 +284,7 @@ void rotkplus_first_play(App &a);
 void rotkplus_pads_section(App &a);    // rotkplus_pads.cpp
 void rotkplus_packs_section(App &a);
 void rotkplus_pad_lines(App &a, std::vector<std::string> &lines);
+std::string pad_shown_name(const char *n);   // a controller's name as shown ("#SettingsController_SteamController": "Steam Controller")
 void tab_graphics_plus(App &a);   // Graphics with the HD packs, Controls with the players' controllers
 void tab_controls_plus(App &a);
 void tab_gameplay_plus(App &a);   // Gameplay: ROTKPlus' choices, then the game's own

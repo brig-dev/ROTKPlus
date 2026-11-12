@@ -21,7 +21,8 @@ void orn_plate(ImDrawList *dl, ImVec2 a, ImVec2 b, ImU32 fill, bool lit);
 void orn_elf_rule(ImDrawList *dl, float x0, float x1, float y);
 // An arched bronze plaque button with a boss at the top (men); returns true when clicked
 bool orn_arch_button(const char *label, ImVec2 size, ImFont *font, bool enabled);
-// A slender-edged button (elves); returns true when clicked
-bool orn_plate_button(const char *label, ImVec2 size, bool enabled);
+// A slender-edged button (elves); returns true when clicked. nav: a controller's / the keyboard's cursor can move onto
+// it (an InvisibleButton is left out of ImGui's navigation unless asked; the pages' buttons are reached by their own code)
+bool orn_plate_button(const char *label, ImVec2 size, bool enabled, bool nav = false);
 // A tab (elves): notched top corners, bronze and silver edges, open at the bottom; lit when chosen
 void orn_tab(ImDrawList *dl, ImVec2 a, ImVec2 b, bool selected, bool hovered);

@@ -38,9 +38,12 @@ void update_popup(App &a)
         ImGui::Dummy(ImVec2(0, S(8)));
         float bw = S(150), bh = S(40);
         ImGui::SetCursorPosX(ImGui::GetWindowWidth() - S(30) - bw * 2 - S(12));
-        if (orn_plate_button("Update", ImVec2(bw, bh), a.running == NULL)) { update_install_start(v); ImGui::CloseCurrentPopup(); }
+        // with a controller: the cursor starts on Update, Left / Right between the two, A presses (ROTKPlus 1.5.2: the
+        // two buttons were out of ImGui's navigation, so under SteamOS neither A nor X updated, owner's report)
+        if (orn_plate_button("Update", ImVec2(bw, bh), a.running == NULL, true)) { update_install_start(v); ImGui::CloseCurrentPopup(); }
+        if (ImGui::IsWindowAppearing()) ImGui::SetItemDefaultFocus();
         ImGui::SameLine(0, S(12));
-        if (orn_plate_button("Not now", ImVec2(bw, bh), true) || dialog_back()) ImGui::CloseCurrentPopup();
+        if (orn_plate_button("Not now", ImVec2(bw, bh), true, true) || dialog_back()) ImGui::CloseCurrentPopup();
         ImGui::EndPopup();
     }
     ImGui::PopStyleVar();

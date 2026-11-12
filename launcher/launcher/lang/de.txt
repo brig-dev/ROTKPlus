@@ -1529,6 +1529,7 @@ Download ROTKPlus %s from GitHub (about 25 MB) and install it here? = ROTKPlus %
 Choose a saves backup (a zip ROTKPlus made) = Wähle eine Sicherung der Spielstände (ein ZIP, das ROTKPlus gemacht hat)
 ROTKPlus %s is out. Your settings, saves and achievements are kept. = ROTKPlus %s ist erschienen. Deine Einstellungen, Spielstände und Erfolge bleiben.
 ROTKPlus %s is out  -  press Update at the top right = ROTKPlus %s ist erschienen  -  oben rechts Aktualisieren drücken
+ROTKPlus %s is out = ROTKPlus %s ist erschienen
 isn't added to ROTKPlus any more - add it again, then make a new shortcut. = ist nicht mehr zu ROTKPlus hinzugefügt - füge es wieder hinzu und mache dann eine neue Verknüpfung.
 Windows doesn't let ROTKPlus change its own folder. Download the update from its page instead. = Windows lässt ROTKPlus seinen eigenen Ordner nicht ändern. Lade das Update stattdessen von seiner Seite herunter.
 That file isn't a zip ROTKPlus can read. = Diese Datei ist kein ZIP, das ROTKPlus lesen kann.

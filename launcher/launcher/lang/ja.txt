@@ -1518,6 +1518,7 @@ Download ROTKPlus %s from GitHub (about 25 MB) and install it here? = GitHubか�
 Choose a saves backup (a zip ROTKPlus made) = セーブのバックアップを選択（ROTKPlusが作ったzip）
 ROTKPlus %s is out. Your settings, saves and achievements are kept. = ROTKPlus %s が出ました。設定、セーブ、実績はそのまま残ります。
 ROTKPlus %s is out  -  press Update at the top right = ROTKPlus %s が出ました  -  右上の「更新」を押してください
+ROTKPlus %s is out = ROTKPlus %s が出ました
 isn't added to ROTKPlus any more - add it again, then make a new shortcut. = はROTKPlusに追加されていません - もう一度追加してから、新しいショートカットを作ってください。
 Windows doesn't let ROTKPlus change its own folder. Download the update from its page instead. = WindowsはROTKPlusが自分のフォルダーを変更することを許可しません。そのページから更新をダウンロードしてください。
 That file isn't a zip ROTKPlus can read. = そのファイルはROTKPlusが読めるzipではありません。

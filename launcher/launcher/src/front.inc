@@ -772,9 +772,10 @@ static void rotk_version_popup(App &a)
     int chosen = -1;
     float bw = (ImGui::GetContentRegionAvail().x - S(12)) * 0.5f;
     ImGui::PushFont(F_HEAD, F_HEAD->LegacySize);
-    if (orn_plate_button("PC##rv", ImVec2(bw, S(46)), true)) chosen = 0;
+    if (orn_plate_button("PC##rv", ImVec2(bw, S(46)), true, true)) chosen = 0;   // (reachable with a controller)
+    if (ImGui::IsWindowAppearing()) ImGui::SetItemDefaultFocus();
     ImGui::SameLine(0, S(12));
-    if (orn_plate_button("XBOX##rv", ImVec2(bw, S(46)), true)) chosen = 1;
+    if (orn_plate_button("XBOX##rv", ImVec2(bw, S(46)), true, true)) chosen = 1;
     ImGui::PopFont();
     ImGui::PushFont(F_SMALL, F_SMALL->LegacySize);
     ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + bw);

@@ -1601,6 +1601,7 @@ ROTKPlus doesn't send anything itself: you see the report and choose what to pos
 It is normally in the %s folder next to ROTKPlus.exe. If you have it somewhere else, show the launcher where. = Di solito è nella cartella %s accanto ad ROTKPlus.exe. Se ce l'hai altrove, indica al launcher dove.
 ROTKPlus %s is out. Your settings, saves and achievements are kept. = È uscito ROTKPlus %s. Impostazioni, salvataggi e obiettivi vengono mantenuti.
 ROTKPlus %s is out  -  press Update at the top right = È uscito ROTKPlus %s  -  premi Aggiorna in alto a destra
+ROTKPlus %s is out = È uscito ROTKPlus %s
 ROTKPlus test pad = ROTKPlus test pad
 isn't added to ROTKPlus any more - add it again, then make a new shortcut. = non è più aggiunto ad ROTKPlus: aggiungilo di nuovo, poi crea un nuovo collegamento.
 Downloads the original Xbox box art of the three games from RetroArch's collection\n(libretro thumbnails, on GitHub) into the covers folder beside ROTKPlus.\nYour own scans there (fotr.png, tt.png, rotk.png) are used first. = Scarica le copertine Xbox originali dei tre giochi dalla raccolta di RetroArch\n(libretro thumbnails, su GitHub) nella cartella covers accanto ad ROTKPlus.\nLe tue scansioni lì (fotr.png, tt.png, rotk.png) hanno la precedenza.

@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Launcher, with a controller: the question "Update ROTKPlus?" can be answered (Update and Not now were left out of the
+  controller's navigation, so neither button could be pressed; the cursor now starts on Update).
+- Launcher: the news of a newer version sits on the line of the settings' summary, in short when it doesn't fit; with a
+  controller's buttons shown too, their line went below the card at the bottom of the settings.
+- Launcher: a Steam Controller under Steam Input is named "Steam Controller" (Steam gave it as
+  "#SettingsController_SteamController"); "Update to 1.5.x" and the news of a newer version are translated.
+
 ## 1.5.1
 
 - **A new logo**: ROTK, a star of four gems (one for each player's colour) and PLUS, on the launcher's front page; the
