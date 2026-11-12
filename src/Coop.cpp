@@ -518,6 +518,20 @@ static void __cdecl AdjustCameraFocus()
             const float d = d2(pts[i], pts[j]);
             if (d > best) { best = d; bi = i; bj = j; }
         }
+    // (diagnosis, 12/11/2026: in the Palantir of Sauron with four players the camera went far away and then stayed down
+    // among the characters until the end of the level, from the moment the level moved players 1 and 2; nothing in the
+    // log said why. A group wider than 30 units is written down, at most once every 5 s, with every point framed.)
+    if (best > 900.0f) {
+        static DWORD at; static int told;
+        const DWORD now = GetTickCount();
+        if ((!at || now - at > 5000) && told < 60) {
+            at = now; ++told;
+            char line[400]; int k = 0;
+            for (int i = 0; i < n && k < (int)sizeof line - 60; ++i)
+                k += sprintf_s(line + k, sizeof line - k, " (%.1f, %.1f, %.1f)", pts[i][0], pts[i][1], pts[i][2]);
+            Log("co-op: camera: a group %.1f wide (points %d and %d of %d):%s", sqrtf(best), bi + 1, bj + 1, n, line);
+        }
+    }
     memcpy(a, pts[bi], sizeof pts[bi]);
     memcpy(b, pts[bj], sizeof pts[bj]);
 }
@@ -725,6 +739,36 @@ static void FollowLevelTeleports()
             ++moved;
         }
         Log("co-op: players 1 and 2 moved by the level, %d of the others brought along", moved);
+    }
+}
+
+// --- a spear that somebody already holds (11/11/2026, SteamOS, the Courtyard with four players) -------------------
+// Entering the state "spear_grab" (0x4379B0, the enter function of entry 0x42 of the heroes' states table, the pointer at
+// 0x5616B4) the game looks at the spear in +0xD0 -> +0x6C. If its +0x12D is set (somebody holds it: 0x452530 writes it)
+// it sends the hero back to the idle animation and clears +0x6C... and then goes on and reads it (0x437A38, then
+// fld [eax+0x30] at 0x437A3B with eax = 0): a crash. With two players that almost never happens; with four close to each
+// other (one controller for four, or the recalls and the level's teleports that bring them together) two of them reach
+// the same spear in the same frame. Log of 11/11/2026 23:51: "CRASH at 00437A3B (read 00000030)" 1.5 s after a scene of
+// the Courtyard had moved the players. In that case this does what the game's own code does up to the clearing, and
+// stops there; the state's update (0x437AE0) and its events (0x437BE0) already handle a hero with no spear.
+static void __cdecl SpearGrabEnter(uint32_t x, uint8_t* c, uint32_t y)
+{
+    typedef void(__cdecl* StateFn)(uint32_t, uint8_t*, uint32_t);
+    uint8_t* d0 = *(uint8_t**)(c + 0xD0);
+    const uint8_t* spear = *(const uint8_t**)(d0 + 0x6C);
+    if (spear && !spear[0x12D]) { ((StateFn)0x4379B0)(x, c, y); return; }   // the spear is free: the game's own grab
+    if (StateFn cb = *(StateFn*)(d0 + 0x388)) cb(x, c, y);
+    typedef void(__cdecl* AnimFn)(uint8_t*, uint32_t, int, int);
+    ((AnimFn)0x42F440)(c, 0x4439A0, 0x43, 2);
+    ((AnimFn)0x42F440)(c, 0x4439A0, 0, 0);
+    *(uint32_t*)(d0 + 0x6C) = 0;
+    ((void(__cdecl*)(uint8_t*))0x416A50)(c);
+    static int n;
+    if (n++ < 20) {
+        int who = 0;
+        for (int i = 0; i < 4; ++i) if (g_players[i] == (uint32_t)(uintptr_t)c) who = i + 1;
+        Log("co-op: %s %d reached a spear that %s: no grab (the game's own code would have crashed at 0x437A3B)",
+            who ? "player" : "character", who ? who : *(const uint16_t*)(c + 0x78), spear ? "somebody already holds" : "is gone");
     }
 }
 
@@ -938,6 +982,8 @@ bool CoopInstall()
     ok &= PatchJmp(0x488C60, unfrzOld, sizeof unfrzOld, (const void*)&FreezeAll);
     // victory: level completed for the extra players' heroes too
     ok &= PatchCall(0x480C6B, 0x47F590, (const void*)&CreditExtraStub);
+    // two heroes on the same spear in the same frame: no crash (see SpearGrabEnter)
+    ok &= PatchDword(0x5616B4, 0x4379B0, (uint32_t)(uintptr_t)&SpearGrabEnter);
     // co-op camera that frames the extra players (and brings back whoever is stuck outside the frame); [Coop] Camera=0
     // leaves the game's own framing of players 1 and 2
     g_camera = IniInt("Coop", "Camera", 1) != 0;

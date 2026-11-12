@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.5.1
+
+- **A new logo**: ROTK, a star of four gems (one for each player's colour) and PLUS, on the launcher's front page; the
+  star alone in the pages' header and as the launcher's icon; the pictures for Steam's library made again with it.
+- Launcher: clicking quickly through the settings tabs no longer holds the window for 10-15 s (the look at the PC's
+  graphics card now runs on a thread of its own), and opening About no longer holds it for about 3 s (ROTK Fix's
+  version in the DLLs is read on a thread of its own). A frame slower than 0.7 s is written to ROTKPlus-Launcher.log,
+  beside the launcher, with the page it was on.
+- Co-op with 3 or 4 players: no crash when two heroes reach the same spear in the same frame (a slip in the game's own
+  code, which gave the spear back and then read it again; seen at the Courtyard of Minas Tirith with four players on
+  one controller).
+- Last game: the level's name as on the statistics page. Pelennor Fields and the two Palantir showed "pel02 ITA" or
+  "pal01 ITA" (the game has no text of its own for them).
+- Co-op camera: a group wider than 30 units is written to the log with every point framed, to find why the camera
+  can get lost in the Palantir of Sauron with four players.
+
 ## 1.5.0
 
 - **The ROTKPlus launcher**: a launcher of its own for The Return of the King PC, made from Shagg's Athelas and ROTK

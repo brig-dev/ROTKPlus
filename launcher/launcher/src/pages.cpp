@@ -291,7 +291,8 @@ void draw_ui(App &a, ImVec2 size, SDL_Renderer *ren)
         const ImVec2 wp = ImGui::GetWindowPos();
         if (a.cur >= 0) {
             int e = fr_entry_of(a.lib[a.cur].kind);
-            const FrontTex &ct = e == FR_ROTK && g_boxScan.tex ? g_boxScan : fr_face(a, e);
+            // the player's own scan first, then our mark (the star alone: the whole logo is too wide here), then the cover
+            const FrontTex &ct = e == FR_ROTK && g_boxScan.tex ? g_boxScan : e == FR_ROTK && g_mark.tex ? g_mark : fr_face(a, e);
             float bh = S(104), bw = bh * (ct.tex && ct.h > 0 ? std::max(0.55f, std::min(1.45f, (float)ct.w / ct.h)) : 0.70f);
             ImVec2 p0 = wp + ImVec2(pad + S(4), S(26)), p1 = p0 + ImVec2(bw, bh);
             if (ct.tex) {
@@ -412,6 +413,7 @@ void draw_ui(App &a, ImVec2 size, SDL_Renderer *ren)
             ImGui::SetNextItemWidth(tabW);
             if (ImGui::BeginTabItem(t.name, nullptr, tf)) {
                 rotkSel = idx;
+                g_slowWhere = tabNames[idx];   // for the slow-frame note (main.cpp)
                 pad_tab_focus();
                 ImGui::PopFont();
                 ImGui::BeginChild("tab", ImVec2(0, 0), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);

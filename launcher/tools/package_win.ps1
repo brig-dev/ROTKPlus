@@ -40,6 +40,8 @@ New-Item -ItemType Directory -Force "$Out\covers" | Out-Null
 # (the pictures are not in the public repository: without them the package has none, and the launcher shows its own)
 if (Test-Path "$repo\launcher\art\rotk_cover.png") { Copy-Item "$repo\launcher\art\rotk_cover.png" "$Out\covers\rotk.png" }
 else { Write-Warning "launcher\art\rotk_cover.png missing: no cover in the package" }
+# the mark (the star of four gems) for the pages' header, since 1.5.1
+if (Test-Path "$repo\launcher\art\rotk_mark.png") { Copy-Item "$repo\launcher\art\rotk_mark.png" "$Out\covers\rotk-mark.png" }
 # the pictures for Steam's library (ROTKPlus as a non-Steam game), with how to set them
 New-Item -ItemType Directory -Force "$Out\steam" | Out-Null
 Copy-Item "$repo\launcher\art\steam\*" "$Out\steam\"

@@ -39,12 +39,11 @@ static void read_gpu(HwInfo &h)
     h.integrated = h.gpu.empty() || h.vramMB < 512 || (h.vendor == 0x8086 && h.vramMB < 2048);
 }
 
-const HwInfo &hw_info()
+static HwInfo g_hw;
+static volatile LONG g_hwDone = 0, g_hwStarted = 0;
+
+static void read_all(HwInfo &h)
 {
-    static HwInfo h;
-    static bool done;
-    if (done) return h;
-    done = true;
     read_gpu(h);
     DEVMODEA dm; memset(&dm, 0, sizeof dm); dm.dmSize = sizeof dm;
     if (EnumDisplaySettingsA(nullptr, ENUM_CURRENT_SETTINGS, &dm)) {
@@ -60,7 +59,35 @@ const HwInfo &hw_info()
     else if (h.vramMB < 9000) h.tier = 2;
     else h.tier = 3;
     if (h.cores < 4 && h.tier > 1) h.tier--;
-    return h;
+}
+
+static DWORD WINAPI hw_thread(LPVOID)
+{
+    HwInfo h;
+    read_all(h);
+    g_hw = h;
+    InterlockedExchange(&g_hwDone, 1);
+    return 0;
+}
+
+void hw_info_start()
+{
+    if (InterlockedExchange(&g_hwStarted, 1)) return;
+    HANDLE t = CreateThread(NULL, 0, hw_thread, NULL, 0, NULL);
+    if (t) CloseHandle(t);
+    else { read_all(g_hw); InterlockedExchange(&g_hwDone, 1); }   // no thread: as before, here
+}
+
+bool hw_ready()
+{
+    hw_info_start();
+    return InterlockedCompareExchange(&g_hwDone, 0, 0) != 0;
+}
+
+const HwInfo &hw_info()
+{
+    static const HwInfo none;
+    return hw_ready() ? g_hw : none;
 }
 
 const char *hw_tier_name(int tier)

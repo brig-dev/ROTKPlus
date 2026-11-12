@@ -373,7 +373,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR cmdLine, int)
     if (cmdLine && strstr(cmdLine, "--vkprobe")) return gpu_probe_main();   // the background graphics check (gpu.cpp)
     // 1.7.3/1.7.4's build kits and tools, not needed since 1.7.5: removed in the background (thousands of files)
     CloseHandle(CreateThread(NULL, 0, cleanup_thread, NULL, 0, NULL));
-    if (!(cmdLine && strstr(cmdLine, "--install-to "))) gpu_probe_start();
+    if (!(cmdLine && strstr(cmdLine, "--install-to "))) { gpu_probe_start(); hw_info_start(); }
     // "--install-to <dir>" (with administrator rights): put ROTK Fix into a protected game
     // folder, then carry on as the launcher for that game. "--pc <dir>": show that PC game.
     auto quoted_arg = [&](const char *name) {
@@ -531,7 +531,26 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR cmdLine, int)
     if (updates_on()) update_check_start(LAUNCHER_VERSION);
 
     bool playPending = !playArg.empty();
+    // ROTKPlus: a frame that takes over 700 ms (the window seems stuck) is noted in ROTKPlus-Launcher.log beside the
+    // launcher, with the time and the settings tab drawn last, so a freeze can be found afterwards (11 Nov: 10-15 s
+    // while clicking through the settings tabs, nothing in any log). Only slow frames are written: the file stays small.
+    Uint64 frameAt = SDL_GetTicks();
     while (!a.quit) {
+        {
+            Uint64 now = SDL_GetTicks();
+            if (now - frameAt > 700 && ImGui::GetFrameCount() > 30 && !a.running) {
+                FILE *lf = fopen((exe_dir() + "\\ROTKPlus-Launcher.log").c_str(), "a");
+                if (lf) {
+                    SYSTEMTIME st; GetLocalTime(&st);
+                    fprintf(lf, "%04d-%02d-%02d %02d:%02d:%02d  slow frame %llu ms  (%s, %s)\n", st.wYear, st.wMonth, st.wDay,
+                            st.wHour, st.wMinute, st.wSecond, (unsigned long long)(now - frameAt),
+                            a.front ? "front screen" : "game page", g_slowWhere ? g_slowWhere : "-");
+                    fclose(lf);
+                }
+            }
+            frameAt = now;
+            g_slowWhere = nullptr;
+        }
         if (playPending && ImGui::GetFrameCount() > 1) { playPending = false; shortcut_play(a, playArg); }
         test_pad_poll();
         SDL_Event e;

@@ -86,6 +86,7 @@ struct Front {
 static Front g_front;
 
 static FrontTex g_boxScan;            // ROTKPlus: covers\rotk-box.png or .jpg, the player's own scan, for the pages' header
+static FrontTex g_mark;               // ROTKPlus: covers\rotk-mark.png, our mark (the star of four gems) for the pages' header
 static SDL_AtomicInt g_artDl;          // box art download: 0 idle, 1 running, 2 done
 static std::string g_artDlMsg;
 static bool g_artDlBad = false;
@@ -285,6 +286,15 @@ static void front_load_covers(SDL_Renderer *ren)
 {
     g_front.coversLooked = true;
     free_tex(g_boxScan);
+    free_tex(g_mark);
+    {   // the logo is wide (ROTK, the star, PLUS): in the header, a small square, only the star (12/11/2026)
+        int w, h, c;
+        if (unsigned char *px = stbi_load((covers_dir() + "\\rotk-mark.png").c_str(), &w, &h, &c, 4)) {
+            g_mark.tex = make_texture(ren, px, w, h);
+            g_mark.w = w; g_mark.h = h; g_mark.cut = true;
+            stbi_image_free(px);
+        }
+    }
     for (const char *ext : { ".png", ".jpg", ".jpeg" }) {
         int w, h, c;
         unsigned char *px = stbi_load((covers_dir() + "\\rotk-box" + ext).c_str(), &w, &h, &c, 4);
@@ -949,7 +959,8 @@ static void draw_front(App &a, ImVec2 size, SDL_Renderer *ren)
         ty += s3 + S(14);
         const float posterTop = ty - ImGui::GetWindowPos().y;
         float aspect = (float)poster->w / poster->h;
-        float ph = std::min(stripTop - S(24) - posterTop - S(80), size.x * 0.46f / aspect);
+        // (a wide logo, ROTKPlus' since 1.5.1, takes a third of the width; a box or an emblem up to 46%)
+        float ph = std::min(stripTop - S(24) - posterTop - S(80), size.x * (aspect > 1.6f ? 0.34f : 0.46f) / aspect);
         ph = std::max(ph, S(100));
         float pw = ph * aspect;
         ImVec2 p0 = ImGui::GetWindowPos() + ImVec2((size.x - pw) * 0.5f, posterTop), p1 = p0 + ImVec2(pw, ph);

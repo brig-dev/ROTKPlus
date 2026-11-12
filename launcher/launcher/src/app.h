@@ -32,6 +32,8 @@
 #include "userdata.h"
 #include "i18n.h"
 #include "hwrec.h"
+// ROTKPlus: the settings tab drawn last, for the slow-frame note in ROTKPlus-Launcher.log (main.cpp)
+inline const char *g_slowWhere = nullptr;
 #include "builder.h"
 #include <shlobj.h>
 #ifndef ROTKFIX_VERSION

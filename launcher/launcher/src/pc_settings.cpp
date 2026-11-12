@@ -303,7 +303,7 @@ void tab_graphics(App &a)
     int sel = p;
     if (segmented("preset", &sel, pnames, 5, en)) apply_preset(s, sel);
     row_end();
-    if (!g_xboxPage) {
+    if (!g_xboxPage && hw_ready()) {   // (the button appears once the PC has been looked at, a moment after the start)
         // ROTK (PC): Balanced for built-in graphics, High otherwise, Ultra only where its heavy fog scenes stay smooth
         // (a very strong card, a screen up to 1440p at up to 120 Hz)
         const HwInfo &h = hw_info();
@@ -1139,15 +1139,63 @@ void tab_gameplay(App &a)
     ImGui::PopTextWrapPos();
 }
 
+// (12/11/2026: opening About once took 3.3 s on a PC, "slow frame 3321 ms (game page, About)"; each part that takes
+// over 250 ms is written to ROTKPlus-Launcher.log with its name, to find which one)
+static void about_slow(const char *what, Uint64 since)
+{
+    Uint64 ms = SDL_GetTicks() - since;
+    if (ms < 250) return;
+    if (FILE *lf = fopen((exe_dir() + "\\ROTKPlus-Launcher.log").c_str(), "a")) {
+        SYSTEMTIME st; GetLocalTime(&st);
+        fprintf(lf, "%04d-%02d-%02d %02d:%02d:%02d  About: %s took %llu ms\n", st.wYear, st.wMonth, st.wDay, st.wHour,
+                st.wMinute, st.wSecond, what, (unsigned long long)ms);
+        fclose(lf);
+    }
+}
+
+// ROTK Fix's version in a ROTKFix.dll, read on a thread of its own: the About tab asked for it while drawing, and the
+// first reading of the two DLLs (half a megabyte each, looked at by the antivirus the first time) held the window for
+// 2.8-3.3 s on a PC (12/11/2026). Until the answer is in it is "", as when the file can't be read.
+struct FixVerJob { FILETIME t{}; volatile LONG done = 0; std::string v; std::string dll; };
+static DWORD WINAPI fix_ver_thread(LPVOID p)
+{
+    static SRWLOCK lock = SRWLOCK_INIT;   // fix_dll_version keeps one list of what it read: one thread at a time
+    FixVerJob *j = (FixVerJob *)p;
+    AcquireSRWLockExclusive(&lock);
+    j->v = fix_dll_version(j->dll);
+    ReleaseSRWLockExclusive(&lock);
+    InterlockedExchange(&j->done, 1);
+    return 0;
+}
+static std::string about_fix_version(const std::string &dll)
+{
+    static std::map<std::string, FixVerJob *> jobs;   // (a job whose file changed is left to finish and kept: tiny)
+    WIN32_FILE_ATTRIBUTE_DATA fa;
+    if (!GetFileAttributesExA(dll.c_str(), GetFileExInfoStandard, &fa)) return "";
+    FixVerJob *&j = jobs[dll];
+    if (!j || CompareFileTime(&j->t, &fa.ftLastWriteTime) != 0) {
+        bool busy = j && !InterlockedCompareExchange(&j->done, 0, 0);
+        if (busy) return "";   // the old one first (fix_dll_version keeps one list of what it read)
+        j = new FixVerJob();
+        j->t = fa.ftLastWriteTime;
+        j->dll = dll;
+        if (HANDLE h = CreateThread(NULL, 0, fix_ver_thread, j, 0, NULL)) CloseHandle(h);
+        else fix_ver_thread(j);
+    }
+    return InterlockedCompareExchange(&j->done, 0, 0) ? j->v : std::string();
+}
+
 void tab_about(App &a)
 {
+    Uint64 t0 = SDL_GetTicks();
     update_section(a);
+    about_slow("update_section", t0); t0 = SDL_GetTicks();
     section("Your copy");
     const GameInfo &g = a.game;
     status_dot(g.exeFound && g.versionOk, g.exeFound, g.exeFound ? g.versionText.c_str() : "rotk.exe not found - choose your game folder on the About tab", nullptr);
     {   // ROTKPlus: ROTK Fix is part of ROTKPlus and Play keeps it up to date, so a line only when it needs Play
-        std::string inGame = g.hasDll ? fix_dll_version(a.dir + "\\ROTKFix.dll") : "";
-        std::string carried = fix_dll_version(pc_fix_source() + "\\ROTKFix.dll");
+        std::string inGame = g.hasDll ? about_fix_version(a.dir + "\\ROTKFix.dll") : "";
+        std::string carried = about_fix_version(pc_fix_source() + "\\ROTKFix.dll");
         bool files = g.hasDll && g.hasProxyD3D8 && g.hasProxyDinput;
         bool current = inGame.empty() || carried.empty() || inGame == carried;
         if (!files)
@@ -1164,9 +1212,11 @@ void tab_about(App &a)
             status_dot(false, true, w.c_str(), "Its ROTK-PC\\pcfix folder is what Play and Set up copy into your game.");
         }
     }
+    about_slow("ROTK Fix versions", t0); t0 = SDL_GetTicks();
     status_dot(g.hasDxvk, false, "Vulkan renderer (DXVK)", nullptr);
     {
         GpuInfo gi = gpu_info();
+        about_slow("gpu_info", t0); t0 = SDL_GetTicks();
         std::string t = gi.state == GPU_CHECKING ? "Checking the graphics card..."
                       : gi.state == GPU_VULKAN_OK ? "Graphics: " + gi.name + (gi.software ? " (software)" : gi.integrated ? " (integrated)" : "")
                       : gi.state == GPU_VULKAN_TOO_OLD ? "Graphics: " + gi.name + " - Vulkan too old for DXVK; Direct3D 8 is used"
@@ -1178,9 +1228,11 @@ void tab_about(App &a)
     // ROTKPlus: what is there and fine says nothing; only what is missing gets a line
     if (!g.hasSdl) status_dot(false, false, "Controller support (SDL3) is missing", "Press Play to put it back.");
     if (!g.rotkIniExists) status_dot(false, true, "Game settings file will be created", g.rotkIniPath.c_str());
+    about_slow("your copy", t0); t0 = SDL_GetTicks();
     if (ImGui::Button("Change the game folder...")) ImGui::OpenPopup("Your games");
     tip("If you moved the game, or have it installed twice: add the other folder, and choose which one ROTKPlus sets up and starts.");
     saves_section(a, "The Return of the King", a.game.rotkIniDir, "", a.dir);
+    about_slow("saves_section", t0); t0 = SDL_GetTicks();
 
     if (g.discProtected) {
         section("Original disc version");
@@ -1197,7 +1249,9 @@ void tab_about(App &a)
     }
 
     report_section(a);
+    about_slow("report_section", t0); t0 = SDL_GetTicks();
     about_credits(a);
+    about_slow("about_credits (launcher options, shortcuts, credits)", t0);
 
     section("Uninstall");
     ImGui::PushFont(F_SMALL, F_SMALL->LegacySize);

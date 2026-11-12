@@ -17,7 +17,7 @@ usable with a controller. The mod alone is still there for Athelas (see *Install
 **Download:** [GitHub Releases](https://github.com/brig-dev/ROTKPlus/releases) or
 [ModDB](https://www.moddb.com/mods/rotkplus/downloads) (same files). Mod page: <https://www.moddb.com/mods/rotkplus>. What changed: [CHANGELOG.md](CHANGELOG.md)
 
-> **Status:** version 1.5.0. Tested on Windows 11 with the ROTKPlus launcher and with Athelas 1.5 to 1.8.2, the Italian
+> **Status:** version 1.5.1. Tested on Windows 11 with the ROTKPlus launcher and with Athelas 1.5 to 1.8.2, the Italian
 > edition of the game, up to four controllers, keyboard and mouse: the campaign with four players and more enemies up to
 > x7 (Minas Tirith, Pelennor Fields), the Versus modes with two and four players. On SteamOS (Proton): the Versus mode
 > with three players (1.0.0), the whole campaign with Athelas 1.7.x (1.2.0), the 1.4 pages and `FastText=2` with Athelas
@@ -105,7 +105,7 @@ also a mod of Athelas (from Athelas 1.8.1), and the mod alone is in every releas
 Every release has two files, on [GitHub Releases](https://github.com/brig-dev/ROTKPlus/releases) and on
 [ModDB](https://www.moddb.com/mods/rotkplus/downloads).
 
-**`ROTKPlus-Pack-1.5.0.zip`, everything in one (recommended):**
+**`ROTKPlus-Pack-1.5.1.zip`, everything in one (recommended):**
 
 1. Install the game (version 1.0) in a folder of its own, for example `C:\Games\ROTK`.
 2. Unzip the package in another folder, for example `C:\Games\ROTKPlus` (never inside the game's folder).
@@ -118,7 +118,7 @@ Every release has two files, on [GitHub Releases](https://github.com/brig-dev/RO
 Steam Deck and SteamOS: add `ROTKPlus.exe` to Steam as a non-Steam game, with a recent Proton; the package's `steam`
 folder has pictures for the library and how to set them.
 
-**`ROTKPlus-1.5.0-mod.zip`, the mod alone, for Athelas:** copy `ROTKPlus.dll` and `ROTKPlus.ini` from its `athelas_mod`
+**`ROTKPlus-1.5.1-mod.zip`, the mod alone, for Athelas:** copy `ROTKPlus.dll` and `ROTKPlus.ini` from its `athelas_mod`
 folder into `ROTKFix\mods\` in the game folder and turn ROTKPlus on in Athelas' Mods tab.
 
 **The classic way** (`DivxMediaLib.dll`, in the same mod zip, for any setup with ROTK Fix):

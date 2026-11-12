@@ -1198,6 +1198,16 @@ static std::string LevelName(int i)
     return names[i];
 }
 
+// the name of a level by its code, for the Last game: as on the statistics page (11/11/2026: the Last game asked the
+// game's text directly and showed "pel02 ITA"); a code that is not one of kLevels is asked to the game as before
+static std::string LevelNameOf(const std::string& code)
+{
+    if (code.empty()) return std::string();
+    for (int i = 0; i < (int)(sizeof kLevels / sizeof *kLevels); ++i)
+        if (code == kLevels[i]) return LevelName(i);
+    return LangGameText(code.c_str());
+}
+
 // --- the heroes' own event handler (0x43A080, put at +0x384 of every hero by 0x43BA2D) ---------------------------
 // Two of its events are counted here, around the game's own handling, which is not changed:
 //  - (0x259, a hit, is dropped when +0xD0 -> +0x4D8 is set: that is Gandalf's shield, "GAN_Shield1" in 0x4307D0, not a
@@ -3632,7 +3642,7 @@ static void MainPanel(int row)
     case ROW_LAST: {   // the summary of the last game
         if (g_sum.empty()) { Put(Txt(T_LAST_NONE), px, y, s * 0.85f, ST_VALUE, 0, pw); break; }
         std::string kind = Txt(g_sumKind == 3 ? T_LAST_PVP : g_sumKind == 1 ? T_LAST_COOP : T_LAST_LOST);
-        const std::string level = g_sumLevel.empty() ? std::string() : LangGameText(g_sumLevel.c_str());
+        const std::string level = LevelNameOf(g_sumLevel);
         if (!level.empty() && level != g_sumLevel) kind += ": " + level;
         Put(kind, px, y, s * 0.8f, ST_LABEL, 0, pw);
         for (size_t i = 0; i < g_sum.size() && i < 4; ++i) Put(SumLine(g_sum[i]), px, y + 0.06f + i * 0.06f, s * 0.7f, ST_VALUE, 0, pw);
@@ -4422,7 +4432,7 @@ static void DrawLast()
     if (g_sum.empty()) { Put(Txt(T_LAST_NONE), 0.5f, 0.30f, s, ST_LABEL, 2); return; }
     const bool pvp = g_sumKind == 3;
     const float x0 = 0.08f, x1 = 0.92f, colW = 0.13f, rowH = 0.085f;
-    const std::string level = g_sumLevel.empty() ? std::string() : LangGameText(g_sumLevel.c_str());
+    const std::string level = LevelNameOf(g_sumLevel);
     float y = 0.16f;
     if (!level.empty() && level != g_sumLevel) { Put(level, x0, y, s * 1.4f, ST_SEL, 0, x1 - x0); y += 0.065f; }   // its name in the game's language
     // a versus game (04/11/2026): how it ended under the level's name, its kind in the heading ("Versus: Teams, heroes

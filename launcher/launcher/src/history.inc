@@ -8,6 +8,12 @@ struct HiCard { const char *title, *text; };
 struct HiVersion { const char *ver, *date, *name, *summary; HiCard cards[6]; };
 
 static const HiVersion k_hiVersions[] = {
+    { "1.5.1", "12/11/2026", "Four gems",
+      "A new face for ROTKPlus, a smoother launcher and two fixes for four players.",
+      { { "A new logo", "A star of four gems, one for each player, on the front page, in the header and as the icon." },
+        { "No more waiting", "The settings tabs and About open at once: the slow checks run on their own." },
+        { "The same spear", "Two heroes grabbing the same spear at the same moment no longer stop the game." },
+        { "Every name right", "The Last game shows Pelennor Fields and the Palantir by their names." } } },
     { "1.5.0", "09/11/2026", "The great host",
       "Battles as big as the films: more enemies and more allies in every level, chosen on the Multiplayer page. And "
       "ROTKPlus gets a home of its own: this launcher.",

@@ -1386,6 +1386,16 @@ No file of the game is shipped: you need your own copy of The Return of the King
 Your data stays home = Seus dados ficam em casa
 Names and statistics are saved on your PC and never sent anywhere. = Os nomes e as estatísticas são salvos no seu PC e nunca são enviados a lugar nenhum.
 Unofficial = Não oficial
+Four gems = Quatro gemas
+A new face for ROTKPlus, a smoother launcher and two fixes for four players. = Um novo visual para o ROTKPlus, um launcher mais fluido e duas correções para quatro jogadores.
+A new logo = Um novo logo
+A star of four gems, one for each player, on the front page, in the header and as the icon. = Uma estrela de quatro gemas, uma para cada jogador, na página inicial, no cabeçalho e como ícone.
+No more waiting = Sem mais espera
+The settings tabs and About open at once: the slow checks run on their own. = As abas de configurações e Sobre abrem na hora: as verificações lentas rodam à parte.
+The same spear = A mesma lança
+Two heroes grabbing the same spear at the same moment no longer stop the game. = Dois heróis pegando a mesma lança no mesmo instante não travam mais o jogo.
+Every name right = Cada nome no lugar
+The Last game shows Pelennor Fields and the Palantir by their names. = A última partida mostra os Campos de Pelennor e os Palantír pelos nomes.
 The great host = A grande hoste
 Battles as big as the films: more enemies and more allies in every level, chosen on the Multiplayer page. And ROTKPlus gets a home of its own: this launcher. = Batalhas tão grandes quanto nos filmes: mais inimigos e mais aliados em cada fase, escolhidos na página Multijogador. E o ROTKPlus ganha finalmente uma casa própria: este launcher.
 More enemies = Mais inimigos
